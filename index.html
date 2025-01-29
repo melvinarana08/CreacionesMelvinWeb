@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creaciones Melvin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <h1>Creaciones Melvin</h1>
+
+        <div class="selectores">
+            <div class="input-group">
+                <label for="producto">Producto</label>
+                <select id="producto" class="form-control"></select>
+            </div>
+            
+            <div class="input-group">
+                <label for="talla">Talla</label>
+                <select id="talla" class="form-control"></select>
+            </div>
+            
+            <div class="input-group">
+                <label for="cantidad">Cantidad</label>
+                <select id="cantidad" class="form-control"></select>
+            </div>
+        </div>
+
+        <button id="agregar" class="btn-primary">Agregar al carrito</button>
+
+        <h2>Carrito</h2>
+        <div class="table-container">
+            <table id="productosTabla">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Talla</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Total</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <h3 class="total">Total: $<span id="total">0.00</span></h3>
+
+        <button id="imprimirTicket" class="btn-primary">Imprimir Ticket</button>
+
+        <div id="ticketImpresion">
+            <h3>Ticket de Compra</h3>
+            <div class="ticket-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Talla</th>
+                            <th>Precio</th>
+                            <th>Cantidad</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketTabla"></tbody>
+                </table>
+                <h3 class="total">Total: $<span id="ticketTotal"></span></h3>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
