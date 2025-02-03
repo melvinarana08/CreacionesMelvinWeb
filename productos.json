@@ -59,4 +59,11 @@
       {"talla": 44, "precio": 13},
       {"talla": 46, "precio": 13}
     ]
+    "Short": [
+      {"talla": 4, "precio": 6},
+      {"talla": 6, "precio": 6},
+      {"talla": 8, "precio": 6.25},
+      {"talla": 10, "precio": 6.50},
+      {"talla": 12, "precio": 7},
+    ],
   }
