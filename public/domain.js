@@ -34,6 +34,21 @@ export function computeSubtotal(lines) {
   return lines.reduce((acc, l) => acc + computeLineTotal(l.unitPriceCents, l.quantity), 0);
 }
 
+/**
+ * Agrupa líneas por categoría/producto conservando el orden en que apareció
+ * cada categoría y el orden de sus tallas. Devuelve un arreglo nuevo.
+ */
+export function groupLinesByProduct(lines) {
+  if (!Array.isArray(lines)) return [];
+  const groups = new Map();
+  for (const line of lines) {
+    const key = typeof line?.product === 'string' ? line.product : '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(line);
+  }
+  return [...groups.values()].flat();
+}
+
 export function computeTotal(subtotalCents, discountCents) {
   return subtotalCents - discountCents;
 }
@@ -92,7 +107,7 @@ export function buildSalePayload({ cart, clientName, discountCents, deviceId, id
       id,
       deviceId,
       clientName: cleanClient === '' ? null : cleanClient,
-      lines: cart.map((l) => ({
+      lines: groupLinesByProduct(cart).map((l) => ({
         product: l.product,
         size: l.size,
         quantity: l.quantity,

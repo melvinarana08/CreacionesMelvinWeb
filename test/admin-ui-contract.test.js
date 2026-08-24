@@ -26,3 +26,9 @@ test('el alta de producto incluye selector de tallas y talla personalizada', () 
 test('el atributo hidden no puede ser anulado por estilos de vistas', () => {
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
 });
+
+test('el login verifica que la cookie de sesión quedó activa antes de abrir administración', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /Api\.adminLogin\(password\)[\s\S]*Api\.adminSession\(\)/);
+  assert.match(app, /navegador no conservó la sesión/i);
+});

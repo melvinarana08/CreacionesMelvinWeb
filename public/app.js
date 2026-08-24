@@ -40,7 +40,7 @@ function renderCart() {
   const total = D.computeTotal(subtotal, state.discountCents);
 
   $('cartEmpty').hidden = state.cart.length > 0;
-  for (const [i, line] of state.cart.entries()) {
+  for (const line of D.groupLinesByProduct(state.cart)) {
     const li = el('li', 'cart-item');
     const info = el('div', 'cart-item-info');
     info.append(el('div', 'cart-item-name', line.product), el('div', 'cart-item-sub', `Talla ${line.size} · ${line.quantity} × ${D.formatUSD(line.unitPriceCents)}`));
@@ -48,6 +48,8 @@ function renderCart() {
     const rm = el('button', 'remove-btn', '✕');
     rm.setAttribute('aria-label', `Quitar ${line.product} talla ${line.size}`);
     rm.addEventListener('click', () => {
+      const i = state.cart.indexOf(line);
+      if (i < 0) return;
       state.cart.splice(i, 1);
       S.saveCart(state.cart);
       renderCart();
@@ -269,6 +271,12 @@ function showAdminLogin() {
   $('adminPanel').hidden = true;
 }
 
+function requireAdminLogin(message = 'Tu sesión de administración terminó. Inicia sesión nuevamente.') {
+  state.admin.csrf = null;
+  showAdminLogin();
+  showError('adminLoginError', message);
+}
+
 async function enterAdminPanel() {
   state.admin.authenticated = true;
   $('adminLogin').hidden = true;
@@ -282,6 +290,10 @@ async function loadAdminSales() {
   const status = $('salesFilter').value;
   const res = await Api.adminListSales(state.admin.csrf, status);
   if (!res.ok) {
+    if (res.status === 401) {
+      requireAdminLogin();
+      return;
+    }
     showError('adminSalesEmpty', 'No se pudieron cargar las ventas.');
     return;
   }
@@ -486,10 +498,11 @@ async function saveCatalog() {
     renderCatalog();
     showCatalogStatus('✅ Catálogo actualizado correctamente. Los nuevos precios y productos ya están disponibles en ventas.', 'success');
   } else {
-    const message = res.status === 401
-      ? 'Tu sesión de administración expiró. Vuelve a iniciar sesión y guarda nuevamente.'
-      : res.error.message;
-    showCatalogStatus(`No se guardaron los cambios: ${message}`, 'failure');
+    if (res.status === 401) {
+      requireAdminLogin('La sesión terminó antes de guardar. Tus cambios no se enviaron; inicia sesión y vuelve a introducirlos.');
+    } else {
+      showCatalogStatus(`No se guardaron los cambios: ${res.error.message}`, 'failure');
+    }
   }
 
   saveButton.disabled = false;
@@ -583,8 +596,13 @@ async function init() {
     if (!password) return;
     const res = await Api.adminLogin(password);
     if (res.ok) {
-      state.admin.csrf = res.data.csrfToken;
-      await enterAdminPanel();
+      const session = await Api.adminSession();
+      if (session.ok && session.data?.authenticated && session.data.csrfToken) {
+        state.admin.csrf = session.data.csrfToken;
+        await enterAdminPanel();
+      } else {
+        requireAdminLogin('La contraseña fue aceptada, pero el navegador no conservó la sesión. Abre la aplicación desde su dirección original y vuelve a intentarlo.');
+      }
     } else {
       showError('adminLoginError', res.error.message);
     }

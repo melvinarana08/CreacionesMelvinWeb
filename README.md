@@ -23,6 +23,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 - Cliente opcional: un solo campo (nombre o teléfono).
 - Descuento manual: no negativo y ≤ subtotal.
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
+- Las líneas del carrito, la venta guardada y el comprobante se agrupan automáticamente
+  por categoría/producto, aunque se hayan seleccionado intercaladas con otras categorías.
 - **Offline-first:** la venta se guarda primero en IndexedDB (cola local), el último catálogo
   válido se conserva en el dispositivo, se muestra el comprobante y luego se sincroniza.
   UUID idempotente con fallback para HTTP LAN: reenviar la misma venta no la duplica.
@@ -184,3 +186,10 @@ CHANGELOG.md        Historial de cambios
 - `SELLER_TOKEN` se guarda en `localStorage` (obfuscación ligera para LAN; el límite real
   de acceso es la red/Tailscale y, en su caso, HTTPS).
 - Auditoría: retención ilimitada (sin poda) en esta versión.
+
+## Próxima implementación prevista
+
+- Impresión del comprobante de la venta en una **impresora térmica Bluetooth de 53 mm u
+  80 mm**. Se diseñará como integración propia de este proyecto, con plantilla adaptable
+  al ancho y reimpresión controlada; **no corresponde a la Epson TM de Gym OS** ni crea
+  una dependencia con ese proyecto independiente.

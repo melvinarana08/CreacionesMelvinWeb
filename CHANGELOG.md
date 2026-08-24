@@ -35,6 +35,8 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 - Reemplazada la app estática anterior (HTML/CSS/JS + productos.json) por la PWA con backend.
 - El panel de catálogo ahora permite agregar productos con tallas numéricas, tallas en
   letras y tallas personalizadas, además de editar precios.
+- El carrito, el payload de venta y el comprobante agrupan automáticamente las líneas por
+  categoría/producto aunque se seleccionen intercaladas.
 
 ### Corregido
 - El guardado del catálogo muestra estado de progreso, éxito o error junto al botón y
@@ -42,8 +44,14 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 - Las vistas con el atributo `hidden` se ocultan correctamente aunque tengan estilos
   `display`, evitando que venta y administración aparezcan al mismo tiempo.
 - La caché PWA sube a `cm-sales-v3` para entregar la interfaz corregida.
+- El login admin comprueba inmediatamente que el navegador conservó la cookie de sesión;
+  las llamadas API envían credenciales same-origin de forma explícita y un 401 obliga a
+  volver a identificarse con un mensaje claro, sin afirmar que el catálogo fue guardado.
+- La caché PWA sube a `cm-sales-v4` para distribuir estos cambios.
 
 ### No incluido en esta versión
 - Despliegue real en servidor (pendiente; autorizado para gym-node-02, riesgo aceptado).
 - Edición/eliminación de ventas (prohibido por diseño).
 - Restauración manual con verificación en vivo (solo drill automatizado).
+- Impresión térmica Bluetooth de tickets de 53 mm u 80 mm (próxima implementación de este
+  proyecto; independiente de la Epson TM usada por Gym OS).

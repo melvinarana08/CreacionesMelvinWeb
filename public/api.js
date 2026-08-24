@@ -10,7 +10,12 @@ export async function apiFetch(path, { method = 'GET', body, csrf, sellerToken }
 
   let res;
   try {
-    res = await fetch(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+    res = await fetch(path, {
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
   } catch {
     return { ok: false, networkError: true, status: 0, data: null, error: { code: 'network', message: 'Sin conexión con el servidor' } };
   }

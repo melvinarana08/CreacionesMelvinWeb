@@ -59,6 +59,39 @@ test('buildSalePayload construye el payload con snapshot de precios', () => {
   assert.deepEqual(r.payload.lines, [{ product: 'Short', size: 10, quantity: 2, unitPriceCents: 650 }]);
 });
 
+test('groupLinesByProduct agrupa categorías sin depender del orden de selección', () => {
+  const lines = [
+    { product: 'Pantalones', size: 10, quantity: 1, unitPriceCents: 800 },
+    { product: 'Camisas', size: 'M', quantity: 1, unitPriceCents: 600 },
+    { product: 'Pantalones', size: 12, quantity: 2, unitPriceCents: 850 },
+    { product: 'Camisas', size: 'L', quantity: 1, unitPriceCents: 650 },
+  ];
+
+  assert.deepEqual(D.groupLinesByProduct(lines), [lines[0], lines[2], lines[1], lines[3]]);
+  assert.deepEqual(lines.map((line) => line.size), [10, 'M', 12, 'L'], 'no muta el carrito original');
+});
+
+test('buildSalePayload guarda las líneas agrupadas por categoría', () => {
+  const r = D.buildSalePayload({
+    cart: [
+      { product: 'Pantalones', size: 10, quantity: 1, unitPriceCents: 800 },
+      { product: 'Camisas', size: 'M', quantity: 1, unitPriceCents: 600 },
+      { product: 'Pantalones', size: 12, quantity: 1, unitPriceCents: 850 },
+    ],
+    clientName: '',
+    discountCents: 0,
+    deviceId: 'dev-1',
+    id: '123e4567-e89b-12d3-a456-426614174009',
+  });
+
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.payload.lines.map((line) => `${line.product}:${line.size}`), [
+    'Pantalones:10',
+    'Pantalones:12',
+    'Camisas:M',
+  ]);
+});
+
 test('buildSalePayload: cliente vacío se envía como null y errores son explícitos', () => {
   const r = D.buildSalePayload({
     cart: [{ product: 'Short', size: 10, quantity: 1, unitPriceCents: 650 }],
