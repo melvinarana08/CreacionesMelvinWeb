@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Creaciones Melvin — Ventas</title>
+  <meta name="description" content="Calculadora de ventas de Creaciones Melvin. Funciona sin conexión.">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Creaciones Melvin</h1>
+    <div class="status-bar" id="statusBar">
+      <span class="dot" id="connDot" aria-hidden="true"></span>
+      <span id="connText" role="status">Conectando…</span>
+      <span class="pending-badge" id="pendingBadge" hidden></span>
+      <button type="button" id="syncBtn" class="btn btn-small">Sincronizar</button>
+    </div>
+  </header>
+
+  <!-- ============ VENTA ============ -->
+  <main id="saleView">
+    <section id="catalogSection" aria-label="Catálogo">
+      <div class="section-title">
+        <h2>Productos</h2>
+        <button type="button" id="refreshCatalogBtn" class="btn btn-small">Actualizar precios</button>
+      </div>
+      <div id="categoryList" class="category-list" role="group" aria-label="Categorías"></div>
+      <div id="sizePicker" class="size-picker" hidden>
+        <p class="picker-title" id="pickerTitle"></p>
+        <div id="sizeChips" class="size-chips" role="group" aria-label="Tallas"></div>
+        <div class="qty-row">
+          <button type="button" id="qtyMinus" class="btn qty-btn" aria-label="Quitar uno">−</button>
+          <span id="qtyValue" class="qty-value">1</span>
+          <button type="button" id="qtyPlus" class="btn qty-btn" aria-label="Agregar uno">+</button>
+          <button type="button" id="addLineBtn" class="btn btn-primary">Agregar</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="cartSection" class="card" aria-label="Carrito">
+      <h2>Venta actual</h2>
+      <p id="cartEmpty" class="muted">El carrito está vacío.</p>
+      <ul id="cartList" class="cart-list"></ul>
+      <div class="cart-meta">
+        <div class="meta-row"><span>Subtotal</span><span id="subtotalVal">$0.00</span></div>
+        <div class="meta-row">
+          <label for="discountInput">Descuento (USD)</label>
+          <input id="discountInput" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
+        </div>
+        <div class="meta-row total"><span>Total</span><span id="totalVal">$0.00</span></div>
+        <div class="meta-row">
+          <label for="clientInput">Cliente (nombre o teléfono, opcional)</label>
+          <input id="clientInput" type="text" maxlength="100" placeholder="Opcional" autocomplete="off">
+        </div>
+        <p id="cartError" class="error-text" role="alert" hidden></p>
+        <button type="button" id="finishBtn" class="btn btn-primary btn-big">Finalizar venta</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ COMPROBANTE ============ -->
+  <section id="receiptView" class="card" aria-label="Comprobante" hidden>
+    <h2>Comprobante</h2>
+    <p class="receipt-status" id="receiptStatus" role="status"></p>
+    <div id="receiptBody" class="receipt-body"></div>
+    <button type="button" id="newSaleBtn" class="btn btn-primary btn-big">Nueva venta</button>
+  </section>
+
+  <!-- ============ ADMINISTRACIÓN ============ -->
+  <section id="adminView" class="card" aria-label="Administración" hidden>
+    <div id="adminLogin">
+      <h2>Administración</h2>
+      <p class="muted">Acceso restringido. Ingresa la contraseña de administrador.</p>
+      <div class="meta-row">
+        <label for="adminPasswordInput">Contraseña</label>
+        <input id="adminPasswordInput" type="password" autocomplete="current-password">
+      </div>
+      <p id="adminLoginError" class="error-text" role="alert" hidden></p>
+      <button type="button" id="adminLoginBtn" class="btn btn-primary">Entrar</button>
+    </div>
+
+    <div id="adminPanel" hidden>
+      <div class="section-title">
+        <h2>Panel de administración</h2>
+        <button type="button" id="adminLogoutBtn" class="btn btn-small">Salir</button>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Secciones de administración">
+        <button type="button" class="tab active" data-tab="ventas" role="tab">Ventas</button>
+        <button type="button" class="tab" data-tab="catalogo" role="tab">Catálogo</button>
+        <button type="button" class="tab" data-tab="auditoria" role="tab">Auditoría</button>
+      </nav>
+
+      <div id="tab-ventas" class="tab-panel">
+        <div class="section-title">
+          <h3>Ventas</h3>
+          <select id="salesFilter" aria-label="Filtrar ventas">
+            <option value="">Todas</option>
+            <option value="active">Activas</option>
+            <option value="voided">Anuladas</option>
+          </select>
+        </div>
+        <p id="adminSalesEmpty" class="muted">Sin ventas.</p>
+        <ul id="adminSalesList" class="admin-list"></ul>
+      </div>
+
+      <div id="tab-catalogo" class="tab-panel" hidden>
+        <div class="section-title">
+          <h3>Precios</h3>
+          <button type="button" id="catalogSaveBtn" class="btn btn-primary">Guardar precios</button>
+        </div>
+        <p class="muted">Edita el precio en USD de cada talla. En esta versión solo se cambian precios de productos y tallas existentes (para agregar/quitar productos usa productos.json y <code>npm run seed</code>).</p>
+        <div id="catalogEditor" class="catalog-editor-list"></div>
+        <p id="catalogError" class="error-text" role="alert" hidden></p>
+      </div>
+
+      <div id="tab-auditoria" class="tab-panel" hidden>
+        <h3>Auditoría</h3>
+        <ul id="auditList" class="admin-list"></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <button type="button" id="adminLink" class="btn btn-small">Administración</button>
+  </footer>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+node_modules
+.git
+.gitignore
+data
+backups
+.env
+.env.local
+*.log
+README.md
+CHANGELOG.md
+docs
+test
+.github
