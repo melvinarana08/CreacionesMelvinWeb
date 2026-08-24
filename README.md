@@ -83,8 +83,13 @@ docker compose up -d --build
 - `compose.yaml` exige `ADMIN_PASSWORD` (error al arrancar si falta).
 
 ### Despliegue en gym-node-02
+Estado confirmado el 2026-08-24: desplegado en `http://192.168.1.134:3002`, contenedor
+saludable, volumen SQLite persistente y acceso limitado a LAN/subnet router. Como el
+endpoint vigente es HTTP directo, usa `COOKIE_SECURE=false`; debe cambiar a `true` en la
+misma ventana en que se introduzca un proxy HTTPS.
+
 1. Copiar el repo, crear `.env` con `ADMIN_PASSWORD` fuerte (y `SELLER_TOKEN` si se desea).
-2. Configuración de producción prevista: `BIND_ADDRESS=192.168.1.134` y `PORT=3002`.
+2. Configuración de producción vigente: `BIND_ADDRESS=192.168.1.134` y `PORT=3002`.
 3. Exponer **solo** por LAN/Tailscale (p. ej. Tailscale Serve o nftables que restrinja el puerto).
 4. Detrás de un reverse proxy con HTTPS, definir `COOKIE_SECURE=true` y `TRUST_PROXY=true`.
 5. `docker compose up -d --build` y verificar `curl http://192.168.1.134:3002/api/health`.

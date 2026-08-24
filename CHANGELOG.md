@@ -27,6 +27,8 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
   (volumen persistente, sin docker.sock), `.env.example`, `scripts/backup.mjs`
   (respaldo consistente VACUUM INTO + sha256), `scripts/seed.js`, `scripts/gen-icons.mjs`.
 - **CI** GitHub Actions (`npm test` + `npm run check` en Node 24).
+- **Despliegue:** versión activa en `gym-node-02` por `192.168.1.134:3002`, limitada a
+  LAN/subnet router, con volumen SQLite persistente, respaldo verificado e imagen de rollback.
 - **Documentación**: README completo, `docs/DECISIONS.md`, este changelog.
 - **Restore drill automatizado** (`test/backup.test.js`): respaldo → borrado →
   restauración → verificación de integridad.
@@ -52,7 +54,6 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 - La caché PWA sube a `cm-sales-v4` para distribuir estos cambios.
 
 ### No incluido en esta versión
-- Despliegue real en servidor (pendiente; autorizado para gym-node-02, riesgo aceptado).
 - Edición/eliminación de ventas (prohibido por diseño).
 - Restauración manual con verificación en vivo (solo drill automatizado).
 - Impresión térmica Bluetooth de tickets de 53 mm u 80 mm (próxima implementación de este
