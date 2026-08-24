@@ -31,9 +31,11 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 ### Administración (protegida con contraseña)
 - Listar ventas (activas/anuladas/todas).
 - **Anular** ventas con motivo obligatorio (nunca editar/eliminar una venta finalizada).
-- **Editar precios** con UI estructurada (tarjetas por producto, fila por talla con
-  input monetario). En v0.1 solo se cambian precios de productos/tallas existentes;
-  para agregar/quitar productos se usa `productos.json` + `npm run seed`.
+- **Editar catálogo** con UI estructurada (tarjetas por producto y fila por talla):
+  actualizar precios y agregar productos nuevos desde el panel.
+- Al crear un producto se eligen tallas numéricas **1–20**, tallas en letras
+  (**XS, S, M, L, XL, 2XL, 3XL, Otro**) o una talla personalizada (por ejemplo 22 o 4XL).
+- Confirmación visible de guardado y actualización inmediata del catálogo de ventas.
 - Auditoría de acciones administrativas.
 
 ### Datos de cada venta
@@ -172,9 +174,8 @@ CHANGELOG.md        Historial de cambios
 
 ## Limitaciones de esta versión (v0.1)
 
-- El panel de administración edita **solo precios** de productos/tallas existentes
-  (UI estructurada). Agregar o quitar productos/tallas requiere editar `productos.json`
-  y ejecutar `npm run seed` (el endpoint `PUT /api/admin/catalog` acepta catálogo completo).
+- El panel permite actualizar precios y agregar productos/tallas. Quitar o renombrar
+  productos/tallas existentes todavía requiere editar `productos.json` y ejecutar el seed.
 - Las ventas se crean solo desde el catálogo vigente del servidor; si un precio cambió
   entre la vista del terminal y el envío, la venta se rechaza con `409 price_changed` y
   queda marcada como conflicto en la cola local (no se pierde, requiere revisión manual).

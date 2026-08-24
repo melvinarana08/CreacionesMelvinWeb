@@ -15,6 +15,7 @@ const ADMIN_HASH = await hashPassword(ADMIN_PASSWORD);
 
 const UUID1 = '123e4567-e89b-12d3-a456-426614174000';
 const UUID2 = '123e4567-e89b-12d3-a456-426614174001';
+const UUID3 = '123e4567-e89b-12d3-a456-426614174002';
 
 function salePayload(over = {}) {
   return {
@@ -194,6 +195,7 @@ test('integración HTTP: flujo completo venta + admin', async (t) => {
   const newCatalog = [
     { name: 'Short', sizes: [{ size: 10, priceCents: 900 }, { size: 12, priceCents: 950 }] },
     { name: 'Nuevo Producto', sizes: [{ size: 4, priceCents: 300 }] },
+    { name: 'Chalecos', sizes: [{ size: 'XS', priceCents: 1200 }, { size: 'Otro', priceCents: 1500 }] },
   ];
   const put = await jsonFetch(base, '/api/admin/catalog', {
     method: 'PUT',
@@ -203,8 +205,19 @@ test('integración HTTP: flujo completo venta + admin', async (t) => {
   });
   assert.equal(put.status, 200);
   const catAfter = await jsonFetch(base, '/api/catalog');
-  assert.equal(catAfter.data.catalog.length, 2);
+  assert.equal(catAfter.data.catalog.length, 3);
   assert.ok(catAfter.data.catalog.some((p) => p.name === 'Nuevo Producto'));
+
+  // tallas en letras se guardan y pueden venderse
+  const alphaSizeSale = await jsonFetch(base, '/api/sales', {
+    method: 'POST',
+    body: salePayload({
+      id: UUID3,
+      lines: [{ product: 'Chalecos', size: 'XS', quantity: 1, unitPriceCents: 1200 }],
+    }),
+  });
+  assert.equal(alphaSizeSale.status, 201);
+  assert.equal(alphaSizeSale.data.sale.items[0].size, 'XS');
 
   // con el precio nuevo, la venta vieja con precio viejo → 409 (precio inmutable en curso)
   const stale = await jsonFetch(base, '/api/sales', {

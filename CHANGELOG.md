@@ -33,6 +33,15 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 
 ### Cambiado
 - Reemplazada la app estática anterior (HTML/CSS/JS + productos.json) por la PWA con backend.
+- El panel de catálogo ahora permite agregar productos con tallas numéricas, tallas en
+  letras y tallas personalizadas, además de editar precios.
+
+### Corregido
+- El guardado del catálogo muestra estado de progreso, éxito o error junto al botón y
+  actualiza inmediatamente la vista de ventas y la caché local.
+- Las vistas con el atributo `hidden` se ocultan correctamente aunque tengan estilos
+  `display`, evitando que venta y administración aparezcan al mismo tiempo.
+- La caché PWA sube a `cm-sales-v3` para entregar la interfaz corregida.
 
 ### No incluido en esta versión
 - Despliegue real en servidor (pendiente; autorizado para gym-node-02, riesgo aceptado).

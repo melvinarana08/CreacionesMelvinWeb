@@ -4,7 +4,52 @@ import { readFileSync } from 'node:fs';
 import { toCents } from './money.js';
 
 const MAX_NAME_LEN = 80;
+const MAX_SIZE_LEN = 20;
 const MAX_PRICE_CENTS = 1_000_000; // $10,000.00
+const STANDARD_SIZE_LABELS = new Map([
+  ['xs', 'XS'],
+  ['s', 'S'],
+  ['m', 'M'],
+  ['l', 'L'],
+  ['xl', 'XL'],
+  ['2xl', '2XL'],
+  ['3xl', '3XL'],
+  ['otro', 'Otro'],
+]);
+const STANDARD_SIZE_ORDER = new Map([...STANDARD_SIZE_LABELS.values()].map((size, index) => [size, index]));
+
+/** Normaliza tallas numéricas o de letras a un valor estable. */
+export function normalizeSize(size) {
+  if (typeof size === 'number') {
+    return Number.isInteger(size) && size >= 1 ? size : null;
+  }
+  if (typeof size !== 'string') return null;
+  const clean = size.trim();
+  if (!clean || clean.length > MAX_SIZE_LEN) return null;
+  if (/^\d+$/.test(clean)) {
+    const numeric = Number(clean);
+    return Number.isSafeInteger(numeric) && numeric >= 1 ? numeric : null;
+  }
+  return STANDARD_SIZE_LABELS.get(clean.toLowerCase()) ?? clean;
+}
+
+function sizeKey(size) {
+  return typeof size === 'number' ? `n:${size}` : `s:${size.toLocaleLowerCase('es')}`;
+}
+
+function compareSizes(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'number') return -1;
+  if (typeof b === 'number') return 1;
+  const ai = STANDARD_SIZE_ORDER.get(a);
+  const bi = STANDARD_SIZE_ORDER.get(b);
+  if (ai !== undefined || bi !== undefined) {
+    if (ai === undefined) return 1;
+    if (bi === undefined) return -1;
+    return ai - bi;
+  }
+  return a.localeCompare(b, 'es', { sensitivity: 'base', numeric: true });
+}
 
 /**
  * Convierte el formato de productos.json { "Categoría": [{talla, precio}] }
@@ -51,17 +96,19 @@ export function validateCatalog(catalog) {
     const seenSizes = new Set();
     const sizes = [];
     for (const s of entry.sizes) {
-      if (typeof s.size !== 'number' || !Number.isInteger(s.size) || s.size < 1) {
+      const size = normalizeSize(s.size);
+      if (size === null) {
         throw new Error(`Talla inválida en ${name}: ${s.size}`);
       }
-      if (seenSizes.has(s.size)) throw new Error(`Talla duplicada en ${name}: ${s.size}`);
-      seenSizes.add(s.size);
+      const key = sizeKey(size);
+      if (seenSizes.has(key)) throw new Error(`Talla duplicada en ${name}: ${size}`);
+      seenSizes.add(key);
       if (!Number.isInteger(s.priceCents) || s.priceCents < 0 || s.priceCents > MAX_PRICE_CENTS) {
-        throw new Error(`Precio inválido en ${name} talla ${s.size}: ${s.priceCents}`);
+        throw new Error(`Precio inválido en ${name} talla ${size}: ${s.priceCents}`);
       }
-      sizes.push({ size: s.size, priceCents: s.priceCents });
+      sizes.push({ size, priceCents: s.priceCents });
     }
-    sizes.sort((a, b) => a.size - b.size);
+    sizes.sort((a, b) => compareSizes(a.size, b.size));
     out.push({ name, sizes });
   }
   out.sort((a, b) => a.name.localeCompare(b.name, 'es'));
@@ -75,7 +122,10 @@ export function findProduct(catalog, name) {
 
 /** Precio en centavos de una talla, o null si no existe. */
 export function findSize(product, size) {
-  const s = product.sizes.find((x) => x.size === size);
+  const clean = normalizeSize(size);
+  if (clean === null) return null;
+  const key = sizeKey(clean);
+  const s = product.sizes.find((x) => sizeKey(x.size) === key);
   return s ? s.priceCents : null;
 }
 

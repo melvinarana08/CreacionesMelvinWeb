@@ -34,6 +34,11 @@ test('validateLine: reglas de cantidad, precio y producto', () => {
   assert.equal(D.validateLine({ product: 'Short', size: 10, quantity: 100, unitPriceCents: 650 }).ok, false);
   assert.equal(D.validateLine({ product: 'Short', size: 10, quantity: 1, unitPriceCents: -1 }).ok, false);
   assert.equal(D.validateLine({ product: 'Short', size: 10, quantity: 1, unitPriceCents: '650' }).ok, false);
+  assert.deepEqual(
+    D.validateLine({ product: 'Chaleco', size: 'XL', quantity: 1, unitPriceCents: 1200 }),
+    { ok: true }
+  );
+  assert.equal(D.validateLine({ product: 'Chaleco', size: '', quantity: 1, unitPriceCents: 1200 }).ok, false);
 });
 
 test('buildSalePayload construye el payload con snapshot de precios', () => {
@@ -161,4 +166,27 @@ test('priceEditorToCatalog redondea a centavos y acepta decimales', () => {
   ]);
   assert.equal(r.ok, true);
   assert.equal(r.catalog[0].sizes[0].priceCents, 776);
+});
+
+test('createProductEditor crea productos con tallas numéricas y de letras', () => {
+  const existing = [{ name: 'Camisas', sizes: [{ size: 10, priceInput: '5.00' }] }];
+  const r = D.createProductEditor('  Chalecos  ', [1, 20, 'XS', '2XL', 'Otro'], existing);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.product, {
+    name: 'Chalecos',
+    sizes: [
+      { size: 1, priceCents: 0, priceInput: '' },
+      { size: 20, priceCents: 0, priceInput: '' },
+      { size: 'XS', priceCents: 0, priceInput: '' },
+      { size: '2XL', priceCents: 0, priceInput: '' },
+      { size: 'Otro', priceCents: 0, priceInput: '' },
+    ],
+  });
+});
+
+test('createProductEditor exige nombre único y al menos una talla', () => {
+  const existing = [{ name: 'Camisas', sizes: [] }];
+  assert.equal(D.createProductEditor('', [1], existing).ok, false);
+  assert.equal(D.createProductEditor('camisas', [1], existing).ok, false);
+  assert.equal(D.createProductEditor('Corbatines', [], existing).ok, false);
 });

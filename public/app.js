@@ -70,6 +70,13 @@ function showError(id, message) {
   if (message) node.textContent = message;
 }
 
+function showCatalogStatus(message, type = 'saving') {
+  const node = $('catalogStatus');
+  node.hidden = !message;
+  node.className = `status-text ${type}`;
+  node.textContent = message || '';
+}
+
 function renderCatalog() {
   const list = $('categoryList');
   list.replaceChildren();
@@ -332,21 +339,28 @@ async function loadAdminSales() {
   }
 }
 
-// ---- Editor de precios (UI estructurada, sin textarea JSON) ----
+// ---- Editor de catálogo y precios ----
 
 /** Modelo editable en memoria: [{name, sizes:[{size, priceCents, priceInput}]}] */
 let priceEditor = [];
+const selectedNewProductSizes = new Map();
+const LETTER_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Otro'];
 
-function loadCatalogEditor() {
-  Api.fetchCatalog().then((res) => {
-    if (!res.ok) {
-      showError('catalogError', 'No se pudo cargar el catálogo.');
-      return;
-    }
-    priceEditor = D.priceEditorFromCatalog(res.data.catalog);
-    renderCatalogEditor();
-    showError('catalogError', null);
-  });
+function sizeSelectionKey(size) {
+  return `${typeof size}:${String(size).toLocaleLowerCase('es')}`;
+}
+
+async function loadCatalogEditor() {
+  showCatalogStatus('Cargando catálogo…', 'saving');
+  const res = await Api.fetchCatalog();
+  if (!res.ok) {
+    showCatalogStatus('No se pudo cargar el catálogo. Revisa la conexión e intenta de nuevo.', 'failure');
+    return;
+  }
+  priceEditor = D.priceEditorFromCatalog(res.data.catalog);
+  renderCatalogEditor();
+  showCatalogStatus(null);
+  showError('catalogError', null);
 }
 
 function renderCatalogEditor() {
@@ -354,6 +368,7 @@ function renderCatalogEditor() {
   container.replaceChildren();
   for (const product of priceEditor) {
     const card = el('div', 'price-card');
+    card.dataset.productName = product.name;
     card.append(el('h4', 'price-card-title', product.name));
     const rows = el('div', 'price-rows');
     for (const size of product.sizes) {
@@ -363,9 +378,11 @@ function renderCatalogEditor() {
       input.type = 'text';
       input.inputMode = 'decimal';
       input.value = size.priceInput;
+      input.placeholder = '0.00';
       input.setAttribute('aria-label', `Precio talla ${size.size} de ${product.name}`);
       input.addEventListener('input', () => {
         size.priceInput = input.value;
+        showCatalogStatus('Hay cambios sin guardar.', 'saving');
       });
       row.append(label, input);
       rows.append(row);
@@ -375,21 +392,108 @@ function renderCatalogEditor() {
   }
 }
 
-function saveCatalog() {
+function updateSelectedSizesText() {
+  const sizes = [...selectedNewProductSizes.values()];
+  $('selectedSizesText').textContent = sizes.length
+    ? `Tallas seleccionadas: ${sizes.join(', ')}`
+    : 'Ninguna talla seleccionada.';
+}
+
+function toggleNewProductSize(size, button) {
+  const key = sizeSelectionKey(size);
+  if (selectedNewProductSizes.has(key)) selectedNewProductSizes.delete(key);
+  else selectedNewProductSizes.set(key, size);
+  const selected = selectedNewProductSizes.has(key);
+  button.classList.toggle('selected', selected);
+  button.setAttribute('aria-pressed', String(selected));
+  updateSelectedSizesText();
+}
+
+function renderSizeOption(containerId, sizes) {
+  const container = $(containerId);
+  container.replaceChildren();
+  for (const size of sizes) {
+    const button = el('button', 'btn btn-small', String(size));
+    button.type = 'button';
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => toggleNewProductSize(size, button));
+    container.append(button);
+  }
+}
+
+function openProductDialog() {
+  selectedNewProductSizes.clear();
+  $('productNameInput').value = '';
+  $('customSizeInput').value = '';
+  showError('productDialogError', null);
+  renderSizeOption('newProductSizeOptions', Array.from({ length: 20 }, (_, i) => i + 1));
+  renderSizeOption('newProductLetterSizes', LETTER_SIZES);
+  updateSelectedSizesText();
+  $('productDialog').showModal();
+  $('productNameInput').focus();
+}
+
+function addCustomProductSize() {
+  const raw = $('customSizeInput').value;
+  const size = D.normalizeSizeInput(raw);
+  if (size === null) {
+    showError('productDialogError', 'Escribe una talla válida (por ejemplo: 22 o 4XL).');
+    return;
+  }
+  selectedNewProductSizes.set(sizeSelectionKey(size), size);
+  $('customSizeInput').value = '';
+  showError('productDialogError', null);
+  updateSelectedSizesText();
+}
+
+function createNewProduct() {
+  const created = D.createProductEditor(
+    $('productNameInput').value,
+    [...selectedNewProductSizes.values()],
+    priceEditor
+  );
+  if (!created.ok) {
+    showError('productDialogError', created.reason);
+    return;
+  }
+  priceEditor.push(created.product);
+  renderCatalogEditor();
+  $('productDialog').close();
+  showCatalogStatus(`Producto “${created.product.name}” agregado. Completa sus precios y pulsa Guardar cambios.`, 'saving');
+  const cards = $('catalogEditor').querySelectorAll('.price-card');
+  cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function saveCatalog() {
   showError('catalogError', null);
   const converted = D.priceEditorToCatalog(priceEditor);
   if (!converted.ok) {
-    showError('catalogError', converted.reason);
+    showCatalogStatus(converted.reason, 'failure');
     return;
   }
-  Api.adminPutCatalog(state.admin.csrf, converted.catalog).then((res) => {
-    if (res.ok) {
-      showError('catalogError', 'Precios guardados.');
-      loadCatalog();
-    } else {
-      showError('catalogError', res.error.message);
-    }
-  });
+
+  const saveButton = $('catalogSaveBtn');
+  saveButton.disabled = true;
+  saveButton.textContent = 'Guardando…';
+  showCatalogStatus('Guardando cambios en el servidor…', 'saving');
+
+  const res = await Api.adminPutCatalog(state.admin.csrf, converted.catalog);
+  if (res.ok) {
+    priceEditor = D.priceEditorFromCatalog(res.data.catalog);
+    state.catalog = res.data.catalog;
+    S.saveCatalog(state.catalog);
+    renderCatalogEditor();
+    renderCatalog();
+    showCatalogStatus('✅ Catálogo actualizado correctamente. Los nuevos precios y productos ya están disponibles en ventas.', 'success');
+  } else {
+    const message = res.status === 401
+      ? 'Tu sesión de administración expiró. Vuelve a iniciar sesión y guarda nuevamente.'
+      : res.error.message;
+    showCatalogStatus(`No se guardaron los cambios: ${message}`, 'failure');
+  }
+
+  saveButton.disabled = false;
+  saveButton.textContent = 'Guardar cambios';
 }
 
 async function loadAudit() {
@@ -503,6 +607,16 @@ async function init() {
   });
   $('salesFilter').addEventListener('change', loadAdminSales);
   $('catalogSaveBtn').addEventListener('click', saveCatalog);
+  $('addProductBtn').addEventListener('click', openProductDialog);
+  $('cancelProductBtn').addEventListener('click', () => $('productDialog').close());
+  $('addCustomSizeBtn').addEventListener('click', addCustomProductSize);
+  $('customSizeInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addCustomProductSize();
+    }
+  });
+  $('createProductBtn').addEventListener('click', createNewProduct);
 
   // Estado de conexión
   window.addEventListener('online', () => { state.online = true; renderStatus(); syncAll(); });

@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './errors.js';
 import { lineTotal } from './money.js';
-import { findProduct, findSize, validateCatalog } from './catalog.js';
+import { findProduct, findSize, normalizeSize, validateCatalog } from './catalog.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_QTY = 99;
@@ -80,9 +80,9 @@ export function validateSaleInput(input, catalog) {
     const productEntry = findProduct(catalog, product);
     if (!productEntry) throw new HttpError(400, 'product_not_found', `Producto no existe en el catálogo: ${product}`);
 
-    const size = raw.size;
+    const size = normalizeSize(raw.size);
     const catalogPrice = findSize(productEntry, size);
-    if (catalogPrice === null) throw new HttpError(400, 'size_not_found', `Talla ${size} no existe para ${product}`);
+    if (catalogPrice === null) throw new HttpError(400, 'size_not_found', `Talla ${raw.size} no existe para ${product}`);
 
     const quantity = raw.quantity;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) {

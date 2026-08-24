@@ -81,10 +81,42 @@ test('validateCatalog rechaza tallas o precios inválidos', () => {
     validateCatalog([{ name: 'X', sizes: [{ size: 4, priceCents: 5.5 }] }])
   );
   assert.throws(() =>
-    validateCatalog([{ name: 'X', sizes: [{ size: 'S', priceCents: 500 }] }])
+    validateCatalog([{ name: 'X', sizes: [{ size: '', priceCents: 500 }] }])
   );
   assert.throws(() =>
     validateCatalog([{ name: 'X', sizes: [{ size: 4, priceCents: 1_000_001 }] }])
+  );
+});
+
+test('validateCatalog acepta y normaliza tallas en letras', () => {
+  const out = validateCatalog([
+    {
+      name: ' Chalecos ',
+      sizes: [
+        { size: ' 2xl ', priceCents: 1200 },
+        { size: 'xs', priceCents: 900 },
+        { size: ' Otro ', priceCents: 1500 },
+        { size: 10, priceCents: 1000 },
+      ],
+    },
+  ]);
+  assert.deepEqual(out[0], {
+    name: 'Chalecos',
+    sizes: [
+      { size: 10, priceCents: 1000 },
+      { size: 'XS', priceCents: 900 },
+      { size: '2XL', priceCents: 1200 },
+      { size: 'Otro', priceCents: 1500 },
+    ],
+  });
+});
+
+test('validateCatalog rechaza tallas en letras duplicadas sin distinguir mayúsculas', () => {
+  assert.throws(
+    () => validateCatalog([
+      { name: 'Corbatas', sizes: [{ size: 'XL', priceCents: 500 }, { size: ' xl ', priceCents: 600 }] },
+    ]),
+    /duplicada/i
   );
 });
 

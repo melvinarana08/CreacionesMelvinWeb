@@ -108,11 +108,15 @@
       </div>
 
       <div id="tab-catalogo" class="tab-panel" hidden>
-        <div class="section-title">
-          <h3>Precios</h3>
-          <button type="button" id="catalogSaveBtn" class="btn btn-primary">Guardar precios</button>
+        <div class="section-title catalog-actions">
+          <h3>Catálogo y precios</h3>
+          <div class="action-group">
+            <button type="button" id="addProductBtn" class="btn">+ Producto</button>
+            <button type="button" id="catalogSaveBtn" class="btn btn-primary">Guardar cambios</button>
+          </div>
         </div>
-        <p class="muted">Edita el precio en USD de cada talla. En esta versión solo se cambian precios de productos y tallas existentes (para agregar/quitar productos usa productos.json y <code>npm run seed</code>).</p>
+        <p id="catalogStatus" class="status-text" role="status" aria-live="polite" hidden></p>
+        <p class="muted">Edita los precios en USD. También puedes agregar productos y elegir tallas numéricas, tallas en letras o una talla personalizada.</p>
         <div id="catalogEditor" class="catalog-editor-list"></div>
         <p id="catalogError" class="error-text" role="alert" hidden></p>
       </div>
@@ -123,6 +127,35 @@
       </div>
     </div>
   </section>
+
+  <dialog id="productDialog" class="product-dialog" aria-labelledby="productDialogTitle">
+    <div class="dialog-content">
+      <h2 id="productDialogTitle">Agregar producto</h2>
+      <p class="muted">Escribe el nombre y selecciona todas las tallas que aplican.</p>
+      <label class="field-label" for="productNameInput">Nombre del producto</label>
+      <input id="productNameInput" type="text" maxlength="80" placeholder="Ej. Corbatines" autocomplete="off">
+
+      <fieldset class="size-fieldset">
+        <legend>Tallas numéricas (1–20)</legend>
+        <div id="newProductSizeOptions" class="size-option-grid"></div>
+      </fieldset>
+      <fieldset class="size-fieldset">
+        <legend>Tallas en letras</legend>
+        <div id="newProductLetterSizes" class="size-option-grid"></div>
+      </fieldset>
+      <div class="custom-size-row">
+        <label for="customSizeInput">Otra talla</label>
+        <input id="customSizeInput" type="text" maxlength="20" placeholder="Ej. 22 o 4XL" autocomplete="off">
+        <button type="button" id="addCustomSizeBtn" class="btn btn-small">Agregar</button>
+      </div>
+      <p id="selectedSizesText" class="muted">Ninguna talla seleccionada.</p>
+      <p id="productDialogError" class="error-text" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelProductBtn" class="btn">Cancelar</button>
+        <button type="button" id="createProductBtn" class="btn btn-primary">Crear producto</button>
+      </div>
+    </div>
+  </dialog>
 
   <footer class="app-footer">
     <button type="button" id="adminLink" class="btn btn-small">Administración</button>

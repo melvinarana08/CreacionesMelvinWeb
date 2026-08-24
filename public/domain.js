@@ -4,6 +4,27 @@
 'use strict';
 
 const MAX_QTY = 99;
+const MAX_SIZE_LEN = 20;
+const STANDARD_SIZE_LABELS = new Map([
+  ['xs', 'XS'], ['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL'],
+  ['2xl', '2XL'], ['3xl', '3XL'], ['otro', 'Otro'],
+]);
+
+export function normalizeSizeInput(size) {
+  if (typeof size === 'number') return Number.isInteger(size) && size >= 1 ? size : null;
+  if (typeof size !== 'string') return null;
+  const clean = size.trim();
+  if (!clean || clean.length > MAX_SIZE_LEN) return null;
+  if (/^\d+$/.test(clean)) {
+    const numeric = Number(clean);
+    return Number.isSafeInteger(numeric) && numeric >= 1 ? numeric : null;
+  }
+  return STANDARD_SIZE_LABELS.get(clean.toLowerCase()) ?? clean;
+}
+
+function sizeKey(size) {
+  return typeof size === 'number' ? `n:${size}` : `s:${size.toLocaleLowerCase('es')}`;
+}
 
 export function computeLineTotal(unitPriceCents, quantity) {
   return unitPriceCents * quantity;
@@ -33,7 +54,7 @@ export function validateLine(line) {
   if (!line || typeof line.product !== 'string' || line.product.trim() === '') {
     return { ok: false, reason: 'Falta el producto' };
   }
-  if (typeof line.size !== 'number') return { ok: false, reason: 'Falta la talla' };
+  if (normalizeSizeInput(line.size) === null) return { ok: false, reason: 'Falta la talla' };
   if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_QTY) {
     return { ok: false, reason: `La cantidad debe ser entre 1 y ${MAX_QTY}` };
   }
@@ -157,4 +178,29 @@ export function priceEditorToCatalog(editor) {
     catalog.push({ name: p.name, sizes });
   }
   return { ok: true, catalog };
+}
+
+/** Crea el modelo editable de un producto nuevo antes de asignar precios. */
+export function createProductEditor(nameInput, selectedSizes, existingEditor = []) {
+  const name = typeof nameInput === 'string' ? nameInput.trim() : '';
+  if (!name) return { ok: false, reason: 'Escribe el nombre del producto' };
+  if (name.length > 80) return { ok: false, reason: 'El nombre del producto es demasiado largo' };
+  if (existingEditor.some((p) => p.name.trim().toLocaleLowerCase('es') === name.toLocaleLowerCase('es'))) {
+    return { ok: false, reason: `Ya existe un producto llamado ${name}` };
+  }
+  if (!Array.isArray(selectedSizes) || selectedSizes.length === 0) {
+    return { ok: false, reason: 'Selecciona al menos una talla' };
+  }
+  const seen = new Set();
+  const sizes = [];
+  for (const raw of selectedSizes) {
+    const size = normalizeSizeInput(raw);
+    if (size === null) return { ok: false, reason: `Talla inválida: ${raw}` };
+    const key = sizeKey(size);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sizes.push({ size, priceCents: 0, priceInput: '' });
+  }
+  if (sizes.length === 0) return { ok: false, reason: 'Selecciona al menos una talla' };
+  return { ok: true, product: { name, sizes } };
 }
