@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   hashPassword,
   verifyPassword,
   createSessionStore,
 } from '../server/auth.js';
+import { openDb } from '../server/db.js';
 
 test('hashPassword produce hash con salt aleatorio y verifica correctamente', async () => {
   const h1 = await hashPassword('secreto123');
@@ -54,4 +58,35 @@ test('csrfToken válido solo si coincide con la sesión', () => {
   assert.equal(store.hasValidCsrf(a.sessionId, b.csrfToken), false);
   assert.equal(store.hasValidCsrf(a.sessionId, ''), false);
   assert.equal(store.hasValidCsrf('nope', 'x'), false);
+});
+
+test('sesión SQLite sobrevive al reinicio y no almacena el token de cookie en claro', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'cm-auth-'));
+  const file = path.join(dir, 'sessions.db');
+  let firstDb;
+  let secondDb;
+  try {
+    firstDb = openDb(file);
+    const firstInstance = createSessionStore({ db: firstDb, ttlMs: 60_000 });
+    const created = firstInstance.create();
+
+    const stored = firstDb.prepare('SELECT session_hash, csrf_token FROM admin_sessions').get();
+    assert.notEqual(stored.session_hash, created.sessionId);
+    assert.equal(stored.session_hash.length, 64);
+    assert.equal(stored.csrf_token, created.csrfToken);
+    firstDb.close();
+    firstDb = null;
+
+    secondDb = openDb(file);
+    const restartedInstance = createSessionStore({ db: secondDb, ttlMs: 60_000 });
+    assert.equal(restartedInstance.get(created.sessionId).csrfToken, created.csrfToken);
+    assert.equal(restartedInstance.hasValidCsrf(created.sessionId, created.csrfToken), true);
+
+    restartedInstance.destroy(created.sessionId);
+    assert.equal(restartedInstance.get(created.sessionId), null);
+  } finally {
+    firstDb?.close();
+    secondDb?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

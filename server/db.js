@@ -52,6 +52,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  session_hash TEXT PRIMARY KEY,             -- SHA-256 del token enviado en cookie
+  csrf_token TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 `;
 
 /**

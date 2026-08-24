@@ -1,7 +1,7 @@
-// auth.js — hash de contraseñas (scrypt), sesiones en memoria y CSRF.
+// auth.js — hash de contraseñas (scrypt), sesiones SQLite y CSRF.
 // Seguridad: hash con salt aleatorio + scrypt; sesión con token aleatorio de
 // 256 bits en cookie HttpOnly SameSite=Strict; token CSRF separado por sesión.
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const scryptAsync = promisify(scrypt);
@@ -40,31 +40,60 @@ export async function verifyPassword(password, stored) {
   }
 }
 
-/** Almacén de sesiones en memoria con expiración perezosa. */
-export function createSessionStore({ ttlMs = 8 * 60 * 60 * 1000 } = {}) {
-  const sessions = new Map();
+function hashSessionId(sessionId) {
+  return createHash('sha256').update(String(sessionId)).digest('hex');
+}
+
+/**
+ * Almacén de sesiones. Con `db` persiste en SQLite y sobrevive reinicios o
+ * múltiples instancias; sin `db` conserva el Map en memoria para pruebas aisladas.
+ * En SQLite solo se guarda SHA-256 del token de cookie, nunca el token reutilizable.
+ */
+export function createSessionStore({ ttlMs = 8 * 60 * 60 * 1000, db = null } = {}) {
+  const sessions = db ? null : new Map();
+
+  const insertSession = db?.prepare(`
+    INSERT INTO admin_sessions (session_hash, csrf_token, expires_at)
+    VALUES (?, ?, ?)
+  `);
+  const selectSession = db?.prepare(`
+    SELECT csrf_token AS csrfToken, expires_at AS expiresAt
+    FROM admin_sessions WHERE session_hash = ?
+  `);
+  const deleteSession = db?.prepare('DELETE FROM admin_sessions WHERE session_hash = ?');
+  const deleteExpired = db?.prepare('DELETE FROM admin_sessions WHERE expires_at < ?');
+  const countSessions = db?.prepare('SELECT COUNT(*) AS count FROM admin_sessions WHERE expires_at >= ?');
 
   return {
     create() {
       const sessionId = randomBytes(32).toString('hex');
       const csrfToken = randomBytes(16).toString('hex');
-      sessions.set(sessionId, { csrfToken, expiresAt: Date.now() + ttlMs });
+      const expiresAt = Date.now() + ttlMs;
+      if (db) {
+        deleteExpired.run(Date.now());
+        insertSession.run(hashSessionId(sessionId), csrfToken, expiresAt);
+      } else {
+        sessions.set(sessionId, { csrfToken, expiresAt });
+      }
       return { sessionId, csrfToken };
     },
 
     /** Devuelve la sesión si es válida (no expirada), o null. */
     get(sessionId) {
-      const s = sessions.get(sessionId);
+      const key = db ? hashSessionId(sessionId) : sessionId;
+      const s = db ? selectSession.get(key) : sessions.get(key);
       if (!s) return null;
       if (Date.now() > s.expiresAt) {
-        sessions.delete(sessionId);
+        if (db) deleteSession.run(key);
+        else sessions.delete(key);
         return null;
       }
       return s;
     },
 
     destroy(sessionId) {
-      sessions.delete(sessionId);
+      if (db) deleteSession.run(hashSessionId(sessionId));
+      else sessions.delete(sessionId);
     },
 
     hasValidCsrf(sessionId, csrfToken) {
@@ -74,6 +103,10 @@ export function createSessionStore({ ttlMs = 8 * 60 * 60 * 1000 } = {}) {
     },
 
     get size() {
+      if (db) {
+        deleteExpired.run(Date.now());
+        return Number(countSessions.get(Date.now()).count);
+      }
       return sessions.size;
     },
   };

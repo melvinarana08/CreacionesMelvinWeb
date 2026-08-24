@@ -37,14 +37,16 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
   endpoint de edición/eliminación de ventas (DELETE → 404/405).
 - **Por qué:** requisito explícito; la anulación conserva el original para auditoría.
 
-## 6. Sesiones en memoria + CSRF token por sesión + SameSite=Strict
-- **Decisión:** sesiones en `Map` en memoria (token de 256 bits), cookie `HttpOnly;
-  SameSite=Strict; Path=/` (+`Secure` configurable). Las mutaciones admin exigen
+## 6. Sesiones en SQLite + CSRF token por sesión + SameSite=Strict
+- **Decisión:** sesiones persistentes en SQLite (token aleatorio de 256 bits), cookie
+  `HttpOnly; SameSite=Strict; Path=/` (+`Secure` configurable). La base guarda solamente
+  SHA-256 del token de sesión y elimina registros expirados. Las mutaciones admin exigen
   `X-CSRF-Token` (comparación `timingSafeEqual`) y `Origin` same-origin cuando el header
   viene (curl sin Origin funciona con el token, que un navegador externo no puede leer).
-- **Por qué:** sin dependencias, sin tablas de sesión, suficiente para LAN. `SameSite=Strict`
-  + token CSRF + Origin cubren el caso de navegador (la amenaza real). Costo asumido:
-  reiniciar el servidor cierra sesiones.
+- **Por qué:** `SameSite=Strict` + token CSRF + Origin cubren el caso de navegador; SQLite
+  evita que un reinicio o dos instancias que comparten la BD conviertan un login válido en
+  `401 Sesión requerida`. Guardar solo el hash impide reutilizar una sesión desde una copia
+  de la tabla. Costo: una escritura por login/logout y limpieza perezosa de expiradas.
 
 ## 7. Rate-limit del login en memoria
 - **Decisión:** 5 fallos por IP → 429 durante 60 s (clave por IP; `TRUST_PROXY` para

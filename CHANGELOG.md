@@ -47,6 +47,8 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 - El login admin comprueba inmediatamente que el navegador conservó la cookie de sesión;
   las llamadas API envían credenciales same-origin de forma explícita y un 401 obliga a
   volver a identificarse con un mensaje claro, sin afirmar que el catálogo fue guardado.
+- Las sesiones admin ahora persisten en SQLite (solo se guarda SHA-256 del token) y siguen
+  siendo válidas después de reiniciar el servidor o al compartir la BD entre instancias.
 - La caché PWA sube a `cm-sales-v4` para distribuir estos cambios.
 
 ### No incluido en esta versión

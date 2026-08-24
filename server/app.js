@@ -169,7 +169,7 @@ export function createApp(opts) {
     adminPasswordHash,
     sellerToken = null,
     seedCatalog = null,
-    sessions = createSessionStore({ ttlMs: SESSION_TTL_MS }),
+    sessions = createSessionStore({ ttlMs: SESSION_TTL_MS, db }),
     secureCookies = false,
     trustProxy = false,
     loginRateLimit = { max: 5, windowMs: 60_000 },

@@ -181,7 +181,9 @@ CHANGELOG.md        Historial de cambios
 - Las ventas se crean solo desde el catálogo vigente del servidor; si un precio cambió
   entre la vista del terminal y el envío, la venta se rechaza con `409 price_changed` y
   queda marcada como conflicto en la cola local (no se pierde, requiere revisión manual).
-- Sesiones en memoria: reiniciar el servidor cierra sesiones admin (re-login).
+- Las sesiones admin se conservan en SQLite hasta su expiración de 8 horas y funcionan
+  entre reinicios o instancias que comparten la misma base; la BD guarda solo SHA-256 del
+  token de cookie, no el token reutilizable.
 - La anulación es permanente (no permite "desanular"); el historial se conserva.
 - `SELLER_TOKEN` se guarda en `localStorage` (obfuscación ligera para LAN; el límite real
   de acceso es la red/Tailscale y, en su caso, HTTPS).

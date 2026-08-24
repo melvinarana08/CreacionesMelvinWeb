@@ -49,6 +49,19 @@ function startServer(opts = {}) {
   });
 }
 
+function listenHandler(handler) {
+  const server = http.createServer(handler);
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      resolve({
+        server,
+        base: `http://127.0.0.1:${server.address().port}`,
+        close: () => new Promise((r) => server.close(r)),
+      });
+    });
+  });
+}
+
 import { replaceCatalog } from '../server/store.js';
 function replaceCatalogFromSeed(db) {
   replaceCatalog(db, loadSeed(SEED));
@@ -255,6 +268,39 @@ test('integración HTTP: flujo completo venta + admin', async (t) => {
   assert.equal(out.status, 200);
   const sessionAfter = await adminGet(base, cookie, '/api/admin/session');
   assert.equal(sessionAfter.data.authenticated, false);
+});
+
+test('sesión admin persiste entre dos instancias que comparten SQLite', async (t) => {
+  const db = openDb(':memory:');
+  replaceCatalogFromSeed(db);
+  const opts = { db, adminPasswordHash: ADMIN_HASH, seedCatalog: SEED };
+  const instanceA = await listenHandler(createApp(opts));
+  const instanceB = await listenHandler(createApp(opts));
+  t.after(async () => {
+    await Promise.all([instanceA.close(), instanceB.close()]);
+    db.close();
+  });
+
+  const loginA = await jsonFetch(instanceA.base, '/api/admin/login', {
+    method: 'POST',
+    body: { password: ADMIN_PASSWORD },
+  });
+  assert.equal(loginA.status, 200);
+  const cookie = cookieFrom(loginA.setCookie);
+  const csrf = loginA.data.csrfToken;
+
+  const sessionB = await adminGet(instanceB.base, cookie, '/api/admin/session');
+  assert.equal(sessionB.status, 200);
+  assert.equal(sessionB.data.authenticated, true);
+
+  const catalog = (await jsonFetch(instanceA.base, '/api/catalog')).data.catalog;
+  const putB = await jsonFetch(instanceB.base, '/api/admin/catalog', {
+    method: 'PUT',
+    cookie,
+    headers: { 'X-CSRF-Token': csrf },
+    body: { catalog },
+  });
+  assert.equal(putB.status, 200);
 });
 
 test('rate-limit: 5 intentos fallidos de login bloquean temporalmente', async (t) => {
