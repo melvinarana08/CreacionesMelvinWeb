@@ -1,0 +1,20 @@
+{
+  "name": "creaciones-melvin-sales",
+  "version": "0.1.0",
+  "description": "Calculadora de ventas y PWA offline-first para Creaciones Melvin (tienda de ropa por talla).",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node server/main.js",
+    "dev": "node --watch server/main.js",
+    "test": "node --test",
+    "seed": "node scripts/seed.js",
+    "backup": "node scripts/backup.mjs",
+    "check": "node --check server/main.js && node --check server/app.js && node --check server/db.js && node --check server/store.js && node --check server/catalog.js && node --check server/money.js && node --check server/auth.js && node --check server/errors.js && node --check scripts/seed.js && node --check scripts/backup.mjs && node --check scripts/gen-icons.mjs && node --check public/app.js && node --check public/domain.js && node --check public/storage.js && node --check public/api.js && node --check public/sw.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -1,0 +1,43 @@
+# compose.yaml — despliegue recomendado (gym-node-02 u otro servidor propio).
+# Uso: cp .env.example .env   (definir ADMIN_PASSWORD y opcionales)
+#      docker compose up -d --build
+name: creaciones-melvin
+
+services:
+  sales:
+    build: .
+    image: creaciones-melvin-sales:0.1.0
+    restart: unless-stopped
+    ports:
+      # Bind explícito: por defecto solo loopback (127.0.0.1). En producción
+      # exponer la IP de la interfaz, p. ej. BIND_ADDRESS=192.168.1.134 PORT=3002
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - DB_PATH=/app/data/sales.db
+      # Obligatorio en producción: si falta, compose no arranca
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Define ADMIN_PASSWORD en .env}
+      # Opcional: protege el endpoint de ventas con X-Seller-Token
+      - SELLER_TOKEN=${SELLER_TOKEN:-}
+      # true solo detrás de HTTPS (reverse proxy)
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+    volumes:
+      - sales-data:/app/data   # volumen persistente (SQLite + WAL)
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Sin docker.sock: el contenedor no necesita acceso al daemon
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sales-data:

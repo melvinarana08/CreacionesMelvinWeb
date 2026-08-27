@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Datos locales (SQLite, respaldos)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+backups/
+
+# Entorno (nunca commitear secretos)
+.env
+.env.local
+
+# Logs, cookies de pruebas y sistema
+*.log
+npm-debug.log*
+.curl-cookies.txt
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
