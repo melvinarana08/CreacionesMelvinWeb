@@ -2,6 +2,16 @@
 
 Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Añadido
+- Memoria operativa por proyecto con Engram: `.engram/config.json` fija la identidad `creaciones-melvin` para consultas, decisiones y contexto recuperable entre sesiones.
+- Workflow de agentes `creaciones-change-workflow` (`.hermes/skills/`): routing orgánico y cuatro etapas (propuesta, contrato, tareas/implementación, verificación/cierre) con carga bajo demanda. Inspirado en Organic Routing y SDD de Gentle AI; no incorpora la persona, RDD ni el orquestador completo.
+- Regla documentada en `docs/DECISIONS.md`: Git, decisiones y pruebas siguen siendo la fuente durable; Engram no guarda secretos, `.env` reales ni datos de ventas.
+
+### Sin cambios operativos
+- No se modificó código, API, esquema, catálogo, despliegue ni comportamiento de la aplicación en esta ventana.
+
 ## [0.1.0] — 2026-08-24
 
 Primera versión completa y pequeña de la calculadora de ventas de Creaciones Melvin
