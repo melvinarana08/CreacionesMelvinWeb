@@ -130,6 +130,21 @@ cm/{change}/state
 - Engram es memoria de trabajo recuperable; Git, `docs/DECISIONS.md` y las pruebas siguen siendo la fuente durable.
 - La memoria nativa conserva preferencias y hechos personales estables; no dupliques esos datos en Engram salvo contexto operativo del proyecto.
 
+## Despliegue en gym-node-02 (procedimiento verificado 2026-08-28)
+
+1. Acceso SSH por Tailscale: `ssh root@100.97.20.79` (el check web de Tailscale se
+   aprueba una vez en login.tailscale.com; `admin@192.168.1.134` directo NO está autorizado).
+2. El stack es una copia SIN `.git` en `/home/operator1/stacks/creaciones-melvin`
+   (con `.env` real y `rollback.sh`). No es repo: no se hace `git pull`.
+3. Subir cambios: desde el repo local, empaquetar excluyendo secretos/datos:
+   `tar -czf /tmp/cm-deploy.tar.gz --exclude='.git' --exclude='.env' --exclude='data' --exclude='.engram' --exclude='.hermes' --exclude='*.db*' .`
+   luego `scp` a `/tmp/`, extraer en el stack, `chown -R operator1:operator1` y
+   `docker compose up -d --build`.
+4. Verificar: `curl http://192.168.1.134:3002/api/health`, el HTML con el botón nuevo,
+   `sw.js` con la caché nueva y `docker ps` `(healthy)`.
+5. Al cambiar el frontend, subir la caché del service worker (`public/sw.js`, `CACHE`)
+   o los clientes seguirán ejecutando el `app.js` viejo (cache-first).
+
 ## Pitfalls
 
 - No fuerces este workflow por tamaño solamente.
