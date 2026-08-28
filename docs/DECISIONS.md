@@ -2,6 +2,13 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 14. Memoria operativa y workflow ligero para agentes (2026-08-28)
+
+- **Decisión:** usar Engram como memoria operativa por proyecto (`project_name: creaciones-melvin`) y un workflow de cuatro etapas cargado bajo demanda para cambios sustanciales. Git, `docs/DECISIONS.md` y las pruebas conservan la autoridad.
+- **Por qué:** recuperar decisiones, correcciones y contexto entre sesiones sin inflar el prompt fijo, manteniendo directas las tareas pequeñas y aplicando especificación/verificación proporcional únicamente cuando reduce ambigüedad.
+- **Límites:** Engram no almacenará `ADMIN_PASSWORD`, `SELLER_TOKEN`, cookies, datos de ventas reales, respaldos ni evidencia sin sanear. Una memoria nunca sustituye actualizar `CHANGELOG.md`, `docs/DECISIONS.md` ni responder al usuario.
+- **Reversión:** retirar `.engram/config.json` y `.hermes/skills/creaciones-change-workflow/` elimina la integración versionada sin modificar la aplicación ni su despliegue.
+
 ## 1. Stack: Node 24 con built-ins, cero dependencias
 - **Decisión:** `http` + `node:sqlite` + `crypto` + `node:test`, sin `npm install`.
 - **Por qué:** la app es pequeña (un terminal de ventas + admin); cero dependencias
