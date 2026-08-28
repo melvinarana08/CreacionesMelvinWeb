@@ -26,7 +26,7 @@
     <section id="catalogSection" aria-label="Catálogo">
       <div class="section-title">
         <h2>Productos</h2>
-        <button type="button" id="refreshCatalogBtn" class="btn btn-small">Actualizar precios</button>
+        <button type="button" id="pricesBtn" class="btn btn-small">Consultar Precios</button>
       </div>
       <div id="categoryList" class="category-list" role="group" aria-label="Categorías"></div>
       <div id="sizePicker" class="size-picker" hidden>
@@ -80,7 +80,10 @@
         <input id="adminPasswordInput" type="password" autocomplete="current-password">
       </div>
       <p id="adminLoginError" class="error-text" role="alert" hidden></p>
-      <button type="button" id="adminLoginBtn" class="btn btn-primary">Entrar</button>
+      <div class="dialog-actions">
+        <button type="button" id="adminBackBtn" class="btn">Volver a ventas</button>
+        <button type="button" id="adminLoginBtn" class="btn btn-primary">Entrar</button>
+      </div>
     </div>
 
     <div id="adminPanel" hidden>
@@ -153,6 +156,19 @@
       <div class="dialog-actions">
         <button type="button" id="cancelProductBtn" class="btn">Cancelar</button>
         <button type="button" id="createProductBtn" class="btn btn-primary">Crear producto</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="pricesDialog" class="product-dialog" aria-labelledby="pricesDialogTitle">
+    <div class="dialog-content">
+      <h2 id="pricesDialogTitle">Consultar precios</h2>
+      <p class="muted">Precios vigentes del catálogo.</p>
+      <label class="field-label" for="pricesFilter">Filtrar por producto</label>
+      <select id="pricesFilter" aria-label="Filtrar por producto"></select>
+      <div id="pricesList" class="price-list"></div>
+      <div class="dialog-actions">
+        <button type="button" id="closePricesBtn" class="btn">Cerrar</button>
       </div>
     </div>
   </dialog>

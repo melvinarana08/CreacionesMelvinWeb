@@ -32,3 +32,18 @@ test('el login verifica que la cookie de sesión quedó activa antes de abrir ad
   assert.match(app, /Api\.adminLogin\(password\)[\s\S]*Api\.adminSession\(\)/);
   assert.match(app, /navegador no conservó la sesión/i);
 });
+
+test('salir de administración regresa al panel de venta y el login permite volver', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /adminLogoutBtn[\s\S]*showSaleView\(\)/, 'Salir debe volver a la vista de venta');
+  assert.match(app, /adminBackBtn[\s\S]*showSaleView/, 'el login admin debe permitir volver a ventas');
+  assert.ok(html.includes('id="adminBackBtn"'), 'falta el botón Volver a ventas');
+});
+
+test('consultar precios reemplaza el botón obsoleto y es filtrable', () => {
+  assert.ok(!html.includes('refreshCatalogBtn'), 'el botón obsoleto Actualizar precios debe desaparecer');
+  for (const id of ['pricesBtn', 'pricesDialog', 'pricesFilter', 'pricesList', 'closePricesBtn']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
+  }
+  assert.match(html, />Consultar Precios</);
+});

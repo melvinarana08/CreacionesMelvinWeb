@@ -142,6 +142,15 @@ input {
   text-align: right;
 }
 input:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
+select {
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .55rem .7rem;
+  background: var(--card);
+  color: var(--text);
+}
+select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .error-text { color: var(--danger); font-size: .85rem; margin: .25rem 0; }
 .status-text {
   border-radius: 8px;
@@ -196,6 +205,9 @@ input:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .price-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .price-row label { font-size: .9rem; color: var(--text); }
 .price-row input { width: 110px; }
+.price-row-value { font-weight: 700; }
+#pricesFilter { width: 100%; margin: .25rem 0 .75rem; }
+.price-list { display: grid; gap: .6rem; }
 
 .product-dialog {
   width: min(94vw, 560px);

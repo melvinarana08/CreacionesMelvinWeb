@@ -133,6 +133,19 @@ test('formatUSD del frontend coincide con el del servidor', () => {
   assert.equal(D.formatUSD(0), '$0.00');
 });
 
+test('priceRowsFromCatalog filtra por producto o devuelve todos sin mutar', () => {
+  const catalog = [
+    { name: 'Short', sizes: [{ size: 10, priceCents: 650 }, { size: 12, priceCents: 700 }] },
+    { name: 'Camisas', sizes: [{ size: 3, priceCents: 500 }, { size: 'M', priceCents: 600 }] },
+  ];
+  const one = D.priceRowsFromCatalog(catalog, 'Short');
+  assert.deepEqual(one, [{ name: 'Short', sizes: [{ size: 10, priceCents: 650 }, { size: 12, priceCents: 700 }] }]);
+  assert.equal(D.priceRowsFromCatalog(catalog, '').length, 2, 'vacío = todos');
+  assert.equal(D.priceRowsFromCatalog(catalog, 'NoExiste').length, 0);
+  assert.deepEqual(catalog[0].sizes[0], { size: 10, priceCents: 650 }, 'no muta el catálogo');
+  assert.equal(D.priceRowsFromCatalog(null, '').length, 0);
+});
+
 test('catalogToEditor: formato interno → formato productos.json (talla/precio)', () => {
   const out = D.catalogToEditor([
     { name: 'Short', sizes: [{ size: 10, priceCents: 650 }, { size: 12, priceCents: 700 }] },

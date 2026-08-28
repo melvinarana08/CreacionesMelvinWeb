@@ -118,6 +118,62 @@ function openPicker(product, keepSelection = false) {
   $('sizePicker').hidden = false;
 }
 
+// ---------------- Consulta de precios ----------------
+
+function renderPricesFilter() {
+  const filter = $('pricesFilter');
+  const current = filter.value;
+  filter.replaceChildren();
+  const allOpt = el('option', null, 'Todos los productos');
+  allOpt.value = '';
+  filter.append(allOpt);
+  for (const product of state.catalog) {
+    const opt = el('option', null, product.name);
+    opt.value = product.name;
+    filter.append(opt);
+  }
+  if (current && state.catalog.some((p) => p.name === current)) filter.value = current;
+}
+
+function renderPricesList() {
+  const rows = D.priceRowsFromCatalog(state.catalog, $('pricesFilter').value);
+  const container = $('pricesList');
+  container.replaceChildren();
+  if (rows.length === 0) {
+    container.append(el('p', 'muted', 'No hay productos para mostrar.'));
+    return;
+  }
+  for (const product of rows) {
+    const card = el('div', 'price-card');
+    card.append(el('h4', 'price-card-title', product.name));
+    const rowsDiv = el('div', 'price-rows');
+    for (const size of product.sizes) {
+      const row = el('div', 'price-row');
+      row.append(el('span', null, `Talla ${size.size}`), el('span', 'price-row-value', D.formatUSD(size.priceCents)));
+      rowsDiv.append(row);
+    }
+    card.append(rowsDiv);
+    container.append(card);
+  }
+}
+
+/** Abre la consulta de precios refrescando el catálogo desde el servidor cuando hay conexión. */
+async function openPricesDialog() {
+  const res = await Api.fetchCatalog();
+  if (res.ok) {
+    state.catalog = res.data.catalog;
+    S.saveCatalog(state.catalog);
+    state.online = true;
+    renderCatalog();
+  } else {
+    state.online = false;
+  }
+  renderStatus();
+  renderPricesFilter();
+  renderPricesList();
+  $('pricesDialog').showModal();
+}
+
 function renderStatus() {
   $('connDot').className = 'dot ' + (state.online ? 'dot-on' : 'dot-off');
   $('connText').textContent = state.online ? 'En línea' : 'Sin conexión';
@@ -269,6 +325,13 @@ function showAdminLogin() {
   $('adminView').hidden = false;
   $('adminLogin').hidden = false;
   $('adminPanel').hidden = true;
+}
+
+/** Regresa al panel principal (venta). Usado al salir de administración o cancelar el login. */
+function showSaleView() {
+  $('adminView').hidden = true;
+  $('receiptView').hidden = true;
+  $('saleView').hidden = false;
 }
 
 function requireAdminLogin(message = 'Tu sesión de administración terminó. Inicia sesión nuevamente.') {
@@ -587,7 +650,9 @@ async function init() {
     renderCart();
   });
   $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
-  $('refreshCatalogBtn').addEventListener('click', loadCatalog);
+  $('pricesBtn').addEventListener('click', openPricesDialog);
+  $('pricesFilter').addEventListener('change', renderPricesList);
+  $('closePricesBtn').addEventListener('click', () => $('pricesDialog').close());
 
   // Admin
   $('adminLink').addEventListener('click', showAdminLogin);
@@ -610,8 +675,9 @@ async function init() {
   $('adminLogoutBtn').addEventListener('click', async () => {
     await Api.adminLogout(state.admin.csrf);
     state.admin.csrf = null;
-    showAdminLogin();
+    showSaleView();
   });
+  $('adminBackBtn').addEventListener('click', showSaleView);
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));

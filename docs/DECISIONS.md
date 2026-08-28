@@ -2,6 +2,19 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 15. Navegación: salir de administración regresa a la venta (2026-08-28)
+
+- **Decisión:** el botón **Salir** del panel admin cierra la sesión y regresa a la vista de
+  venta (panel principal). La pantalla de login de administración incluye un botón
+  **Volver a ventas**. La consulta de precios es pública desde la vista de venta
+  (**Consultar Precios**), sin necesidad de login.
+- **Por qué:** el terminal de venta es la pantalla principal de la app; el panel admin es
+  una vista temporal. Un logout que deja al operador en el login sin salida visible se
+  percibe como un callejón sin retorno. Consultar precios es una operación de solo lectura
+  que no debe exigir credenciales ni interrumpir la venta.
+- **Reversión:** volver a llamar `showAdminLogin()` tras el logout restaura el
+  comportamiento anterior; quitar el botón de precios no afecta al backend.
+
 ## 14. Memoria operativa y workflow ligero para agentes (2026-08-28)
 
 - **Decisión:** usar Engram como memoria operativa por proyecto (`project_name: creaciones-melvin`) y un workflow de cuatro etapas cargado bajo demanda para cambios sustanciales. Git, `docs/DECISIONS.md` y las pruebas conservan la autoridad.

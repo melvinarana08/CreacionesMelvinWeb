@@ -131,6 +131,21 @@ export function formatUSD(cents) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/**
+ * Filas de precios para la consulta pública: el producto indicado por nombre,
+ * o todos si filterName está vacío. Conserva el orden del catálogo y no lo muta.
+ * @param {Array<{name:string, sizes:Array<{size:number, priceCents:number}>}>} catalog
+ * @param {string} [filterName]
+ * @returns {Array<{name:string, sizes:Array<{size:number, priceCents:number}>}>}
+ */
+export function priceRowsFromCatalog(catalog, filterName = '') {
+  if (!Array.isArray(catalog)) return [];
+  const rows = typeof filterName === 'string' && filterName !== ''
+    ? catalog.filter((p) => p.name === filterName)
+    : catalog;
+  return rows.map((p) => ({ name: p.name, sizes: p.sizes.map((s) => ({ size: s.size, priceCents: s.priceCents })) }));
+}
+
 /** Convierte el catálogo interno a formato productos.json {name: [{talla, precio}]}. */
 export function catalogToEditor(catalog) {
   const out = {};
