@@ -11,6 +11,8 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - Botón **Consultar Precios** en la vista de venta (reemplaza al obsoleto "Actualizar precios"): abre un diálogo con la lista de precios vigentes y un filtro sencillo por producto o "Todos los productos". Refresca el catálogo desde el servidor cuando hay conexión; sin conexión muestra la caché local.
 - Botón **Volver a ventas** en la pantalla de login de administración, para salir del login sin recargar la página.
 - **Impresión térmica Bluetooth de tickets (58 mm ESC/POS)**: botón "Imprimir ticket" en el comprobante de venta. Usa Web Bluetooth API (Chrome/Edge Android) para conectar la impresora (MTP-II / PT-210) y enviar comandos ESC/POS directamente. Módulo `public/printer.js` con funciones puras testeables (`encodeText`, `formatItemLine`, `buildTicketBytes`) y conexión GATT.
+- **Diálogo de detalle de venta en administración**: botón "Ver" en cada venta abre un diálogo con el detalle completo (folio, fecha, cliente, líneas, totales) y un botón "🖨️ Reimprimir" que reimprime el ticket por Bluetooth. Las ventas anuladas muestran el motivo pero no permiten anular de nuevo.
+- **Web Bluetooth requiere HTTPS**: `isWebBluetoothAvailable` verifica `window.isSecureContext` y el mensaje de error guía a la URL HTTPS de Tailscale Serve (`gym-node-02.tail4a98b6.ts.net`), que es el secure context necesario.
 
 ### Corregido
 - Al pulsar **Salir** en el panel de administración, la sesión se cierra y la app regresa al panel principal de venta. Antes quedaba atrapada en la pantalla de login del admin, sin forma de volver a la venta.

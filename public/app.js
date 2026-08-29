@@ -424,31 +424,111 @@ async function loadAdminSales() {
     if (sale.status === 'voided') {
       const vr = el('div', 'void-reason', `Anulada: ${sale.voidReason || 'sin motivo'}`);
       li.append(vr);
-    } else if (state.pendingVoidId === sale.id) {
-      const form = el('div', 'meta-row');
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.maxLength = 200;
-      input.placeholder = 'Motivo de anulación (obligatorio)';
-      const okBtn = el('button', 'btn btn-primary', 'Confirmar');
-      const cancelBtn = el('button', 'btn', 'Cancelar');
-      okBtn.addEventListener('click', async () => {
-        const reason = input.value.trim();
-        if (!reason) return;
-        const resVoid = await Api.adminVoidSale(state.admin.csrf, sale.id, reason);
-        if (resVoid.ok) state.pendingVoidId = null;
-        else showError('adminSalesEmpty', resVoid.error.message);
-        await loadAdminSales();
-      });
-      cancelBtn.addEventListener('click', () => { state.pendingVoidId = null; loadAdminSales(); });
-      form.append(input, okBtn, cancelBtn);
-      li.append(form);
-    } else {
-      const voidBtn = el('button', 'btn btn-small', 'Anular');
-      voidBtn.addEventListener('click', () => { state.pendingVoidId = sale.id; loadAdminSales(); });
-      li.append(voidBtn);
     }
+    // Botones de acción: Ver (detalle + reimprimir) y Anular
+    const actions = el('div', 'admin-item-actions');
+    const viewBtn = el('button', 'btn btn-small', 'Ver');
+    viewBtn.addEventListener('click', () => openSaleDetail(sale));
+    actions.append(viewBtn);
+    if (sale.status !== 'voided') {
+      if (state.pendingVoidId === sale.id) {
+        const form = el('div', 'meta-row void-form');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.maxLength = 200;
+        input.placeholder = 'Motivo de anulación (obligatorio)';
+        const okBtn = el('button', 'btn btn-primary', 'Confirmar');
+        const cancelBtn = el('button', 'btn', 'Cancelar');
+        okBtn.addEventListener('click', async () => {
+          const reason = input.value.trim();
+          if (!reason) return;
+          const resVoid = await Api.adminVoidSale(state.admin.csrf, sale.id, reason);
+          if (resVoid.ok) state.pendingVoidId = null;
+          else showError('adminSalesEmpty', resVoid.error.message);
+          await loadAdminSales();
+        });
+        cancelBtn.addEventListener('click', () => { state.pendingVoidId = null; loadAdminSales(); });
+        form.append(input, okBtn, cancelBtn);
+        li.append(form);
+      } else {
+        const voidBtn = el('button', 'btn btn-small', 'Anular');
+        voidBtn.addEventListener('click', () => { state.pendingVoidId = sale.id; loadAdminSales(); });
+        actions.append(voidBtn);
+      }
+    }
+    li.append(actions);
     list.append(li);
+  }
+}
+
+// ---- Detalle de venta (diálogo) ----
+
+let saleDetailCache = null;
+
+function openSaleDetail(sale) {
+  saleDetailCache = sale;
+  const body = $('saleDetailBody');
+  body.replaceChildren();
+  const when = new Date(sale.serverTs).toLocaleString('es');
+  body.append(el('p', 'muted', `Folio: ${sale.folio} · ${when}`));
+  if (sale.clientName) body.append(el('p', 'muted', `Cliente: ${sale.clientName}`));
+  if (sale.status === 'voided') body.append(el('p', 'void-reason', `ANULADA: ${sale.voidReason || 'sin motivo'}`));
+  body.append(el('div', 'receipt-sep', '-'.repeat(32)));
+  for (const item of sale.items) {
+    const line = el('div', 'receipt-line');
+    const desc = el('span', null, `${item.productName} (T${item.size}) ×${item.quantity}`);
+    const price = el('span', null, D.formatUSD(D.computeLineTotal(item.unitPriceCents, item.quantity)));
+    line.append(desc, price);
+    body.append(line);
+  }
+  body.append(el('div', 'receipt-sep', '-'.repeat(32)));
+  const sub = el('div', 'receipt-line');
+  sub.append(el('span', null, 'Subtotal'), el('span', null, D.formatUSD(sale.subtotalCents)));
+  body.append(sub);
+  if (sale.discountCents > 0) {
+    const disc = el('div', 'receipt-line');
+    disc.append(el('span', null, 'Descuento'), el('span', null, `−${D.formatUSD(sale.discountCents)}`));
+    body.append(disc);
+  }
+  const total = el('div', 'receipt-line receipt-total');
+  total.append(el('span', null, 'TOTAL'), el('span', null, D.formatUSD(sale.totalCents)));
+  body.append(total);
+  showSaleDetailStatus(null);
+  $('saleDetailDialog').showModal();
+}
+
+function showSaleDetailStatus(message, type = 'saving') {
+  const node = $('saleDetailStatus');
+  node.hidden = !message;
+  node.className = `status-text ${type}`;
+  node.textContent = message || '';
+}
+
+async function reprintFromDetail() {
+  if (!saleDetailCache) return;
+  showSaleDetailStatus('Conectando con la impresora…', 'saving');
+  const s = saleDetailCache;
+  const ticketData = {
+    title: `Folio ${s.folio}`,
+    lines: s.items.map((it) => ({
+      product: it.productName,
+      size: it.size,
+      quantity: it.quantity,
+      unitPriceCents: it.unitPriceCents,
+      lineTotalCents: D.computeLineTotal(it.unitPriceCents, it.quantity),
+    })),
+    subtotalCents: s.subtotalCents,
+    discountCents: s.discountCents,
+    totalCents: s.totalCents,
+    folio: s.folio,
+    clientName: s.clientName,
+    date: new Date(s.serverTs).toLocaleString('es'),
+  };
+  const result = await Printer.printReceipt(ticketData);
+  if (result.ok) {
+    showSaleDetailStatus('✅ Ticket reimpreso correctamente.', 'success');
+  } else {
+    showSaleDetailStatus(`No se pudo imprimir: ${result.reason}`, 'failure');
   }
 }
 
@@ -741,6 +821,10 @@ async function init() {
     }
   });
   $('createProductBtn').addEventListener('click', createNewProduct);
+
+  // Detalle de venta (diálogo)
+  $('saleDetailCloseBtn').addEventListener('click', () => $('saleDetailDialog').close());
+  $('saleDetailReprintBtn').addEventListener('click', reprintFromDetail);
 
   // Estado de conexión
   window.addEventListener('online', () => { state.online = true; renderStatus(); syncAll(); });

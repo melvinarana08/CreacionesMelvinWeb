@@ -57,3 +57,13 @@ test('el comprobante tiene botón de impresión térmica Bluetooth', () => {
   assert.match(app, /Printer\.printReceipt/);
   assert.match(app, /import \* as Printer from '\.\/printer\.js'/);
 });
+
+test('admin: diálogo de detalle con reimprimir y botones Ver/Anular', () => {
+  for (const id of ['saleDetailDialog', 'saleDetailBody', 'saleDetailReprintBtn', 'saleDetailCloseBtn']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
+  }
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /openSaleDetail/, 'debe existir openSaleDetail');
+  assert.match(app, /reprintFromDetail/, 'debe existir reprintFromDetail');
+  assert.match(app, /saleDetailCache/, 'debe cachear la venta para reimprimir');
+});

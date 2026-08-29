@@ -193,6 +193,8 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .admin-item-head { display: flex; justify-content: space-between; gap: .5rem; font-weight: 600; }
 .admin-item-sub { font-size: .85rem; color: var(--muted); margin-top: .2rem; }
 .void-reason { font-size: .85rem; color: var(--danger); margin-top: .3rem; }
+.admin-item-actions { display: flex; gap: .4rem; margin-top: .5rem; }
+.receipt-sep { color: var(--muted); font-size: .85rem; margin: .4rem 0; letter-spacing: 2px; }
 
 .catalog-editor-list { display: grid; gap: .75rem; }
 .catalog-actions { align-items: flex-start; flex-wrap: wrap; }
