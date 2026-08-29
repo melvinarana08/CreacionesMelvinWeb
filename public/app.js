@@ -835,9 +835,24 @@ async function init() {
 
   renderCart();
   renderStatus();
+  renderAppVersion();
   await refreshPendingCount();
   await loadCatalog();
   syncAll();
+}
+
+async function renderAppVersion() {
+  const node = $('appVersion');
+  let serverVersion = '';
+  try {
+    const res = await Api.fetchHealth();
+    if (res.ok) serverVersion = res.data.version || '';
+  } catch { /* sin conexión */ }
+  const swVersion = 'v9';
+  const parts = [];
+  if (serverVersion) parts.push(`v${serverVersion}`);
+  parts.push(`cache ${swVersion}`);
+  node.textContent = parts.join(' · ');
 }
 
 init();

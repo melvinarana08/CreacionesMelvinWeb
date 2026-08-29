@@ -67,3 +67,11 @@ test('admin: diálogo de detalle con reimprimir y botones Ver/Anular', () => {
   assert.match(app, /reprintFromDetail/, 'debe existir reprintFromDetail');
   assert.match(app, /saleDetailCache/, 'debe cachear la venta para reimprimir');
 });
+
+test('el footer muestra la versión de la app y la caché del SW', () => {
+  assert.ok(html.includes('id="appVersion"'), 'falta el span de versión en el footer');
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /renderAppVersion/);
+  assert.match(app, /fetchHealth.*version|data\.version/);
+  assert.match(css, /\.app-version/);
+});

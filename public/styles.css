@@ -245,8 +245,16 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
   border-top: 1px solid var(--border);
   padding: .5rem 1rem calc(.5rem + env(safe-area-inset-bottom));
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
   z-index: 10;
+}
+.app-version {
+  font-size: .75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 640px) {
