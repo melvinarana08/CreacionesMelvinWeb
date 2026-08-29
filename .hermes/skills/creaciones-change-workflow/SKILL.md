@@ -130,7 +130,7 @@ cm/{change}/state
 - Engram es memoria de trabajo recuperable; Git, `docs/DECISIONS.md` y las pruebas siguen siendo la fuente durable.
 - La memoria nativa conserva preferencias y hechos personales estables; no dupliques esos datos en Engram salvo contexto operativo del proyecto.
 
-## Despliegue en gym-node-02 (procedimiento verificado 2026-08-28)
+## Despliegue en gym-node-02 (procedimiento verificado 2026-08-29)
 
 1. Acceso SSH por Tailscale: `ssh root@100.97.20.79` (el check web de Tailscale se
    aprueba una vez en login.tailscale.com; `admin@192.168.1.134` directo NO está autorizado).
@@ -144,6 +144,8 @@ cm/{change}/state
    `sw.js` con la caché nueva y `docker ps` `(healthy)`.
 5. Al cambiar el frontend, subir la caché del service worker (`public/sw.js`, `CACHE`)
    o los clientes seguirán ejecutando el `app.js` viejo (cache-first).
+6. Dado que el build de Docker puede tardar >5 minutos, usar `terminal(background=true, notify=true)` y esperar el evento de completado. Si el check de Tailscale expira, volver a abrir la URL de aprobación; no reintentar SSH sin aprobación porque cierra la sesión con timeout.
+7. Para hardware/Bluetooth/USB no es necesario deployment adicional; la impresión térmica ESC/POS se integra como feature de frontend nueva.
 
 ## Pitfalls
 
@@ -154,6 +156,7 @@ cm/{change}/state
 - No marques como desplegado algo solo diseñado o probado localmente.
 - No uses Engram para secretos, `ADMIN_PASSWORD`, `SELLER_TOKEN`, cookies, datos de ventas reales ni respaldos.
 - La versión estable Engram 1.20.0 usa el override del proceso MCP `--project creaciones-melvin`; no dependas únicamente del cwd en sesiones del gateway.
+- En la verificación por preview pane, los elementos `position: fixed` del footer dentro del webview embebido pueden no recibir clics en modo background. Si un botón del footer no responde, preferir `computer_use` en `delivery_mode='foreground'` o verificar por API/DOM programático; no culpar la app sin evidencia de DOM/estado.
 
 ## Verificación
 

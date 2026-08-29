@@ -187,7 +187,10 @@ export const printerState = {
  * @returns {boolean}
  */
 export function isWebBluetoothAvailable() {
-  return typeof navigator !== 'undefined' && !!navigator.bluetooth && typeof navigator.bluetooth.requestDevice === 'function';
+  // Web Bluetooth requiere un secure context: HTTPS o localhost.
+  // En HTTP plano (p. ej. http://192.168.1.134:3002) navigator.bluetooth no existe.
+  if (typeof window === 'undefined') return false;
+  return window.isSecureContext === true && !!navigator.bluetooth && typeof navigator.bluetooth.requestDevice === 'function';
 }
 
 /**
@@ -197,7 +200,7 @@ export function isWebBluetoothAvailable() {
  */
 export async function connectPrinter() {
   if (!isWebBluetoothAvailable()) {
-    return { ok: false, reason: 'Web Bluetooth no está disponible en este navegador. Usa Chrome o Edge en Android.' };
+    return { ok: false, reason: 'Web Bluetooth requiere HTTPS o localhost. Abre la app desde https://gym-node-02.tail4a98b6.ts.net (con Tailscale activo en tu celular).' };
   }
   try {
     const device = await navigator.bluetooth.requestDevice({

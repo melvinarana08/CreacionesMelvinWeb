@@ -128,6 +128,6 @@ test('buildTicketBytes: termina con comando de corte (GS V 0)', () => {
   assert.equal(bytes[len - 1], 0x00);
 });
 
-test('isWebBluetoothAvailable: devuelve false en Node (sin navigator.bluetooth)', () => {
+test('isWebBluetoothAvailable: devuelve false en Node (sin window/navigator.bluetooth)', () => {
   assert.equal(isWebBluetoothAvailable(), false);
 });
