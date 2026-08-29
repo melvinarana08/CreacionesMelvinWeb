@@ -31,6 +31,7 @@ const STATIC_FILES = new Map([
   ['/domain.js', { file: 'domain.js', type: 'text/javascript; charset=utf-8' }],
   ['/storage.js', { file: 'storage.js', type: 'text/javascript; charset=utf-8' }],
   ['/api.js', { file: 'api.js', type: 'text/javascript; charset=utf-8' }],
+  ['/printer.js', { file: 'printer.js', type: 'text/javascript; charset=utf-8' }],
   ['/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8', noCache: true }],
   ['/manifest.webmanifest', { file: 'manifest.webmanifest', type: 'application/manifest+json', noCache: true }],
   ['/icons/icon-192.png', { file: 'icons/icon-192.png', type: 'image/png' }],

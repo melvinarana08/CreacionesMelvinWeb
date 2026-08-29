@@ -15,6 +15,24 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
 - **Reversión:** volver a llamar `showAdminLogin()` tras el logout restaura el
   comportamiento anterior; quitar el botón de precios no afecta al backend.
 
+## 16. Impresión térmica Bluetooth ESC/POS de 58 mm (2026-08-29)
+
+- **Decisión:** el comprobante de venta incluye un botón **Imprimir ticket** que usa
+  **Web Bluetooth API** (`navigator.bluetooth`) para conectar la impresora térmica
+  MTP-II / PT-210 (ESC/POS, 58 mm, 384 puntos/línea) desde el navegador del celular
+  (Chrome/Edge Android). El módulo `public/printer.js` separa la construcción de comandos
+  ESC/POS (puro, testeable) de la conexión GATT (runtime del navegador).
+- **Por qué:** el terminal de venta es una PWA en Android; Web Bluetooth es el camino
+  nativo sin dependencias ni app adicional. ESC/POS es el lenguaje estándar de esta
+  familia de impresoras (manual confirma compatibilidad). Separar la lógica pura permite
+  testear el formato del ticket sin hardware.
+- **Límites:** Web Bluetooth requiere HTTPS (o localhost) y gesto del usuario (clic);
+  no funciona en iOS (Apple no soporta Web Bluetooth). El PIN `0000` se gestiona en el
+  emparejamiento del sistema, no en la app. Si la impresora no responde, el usuario ve
+  un mensaje de error pero la venta ya está guardada (offline-first).
+- **Reversión:** quitar `printer.js`, el botón `printReceiptBtn` y su import; el resto
+  de la app no se ve afectada.
+
 ## 14. Memoria operativa y workflow ligero para agentes (2026-08-28)
 
 - **Decisión:** usar Engram como memoria operativa por proyecto (`project_name: creaciones-melvin`) y un workflow de cuatro etapas cargado bajo demanda para cambios sustanciales. Git, `docs/DECISIONS.md` y las pruebas conservan la autoridad.

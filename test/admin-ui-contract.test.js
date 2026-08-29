@@ -47,3 +47,13 @@ test('consultar precios reemplaza el botón obsoleto y es filtrable', () => {
   }
   assert.match(html, />Consultar Precios</);
 });
+
+test('el comprobante tiene botón de impresión térmica Bluetooth', () => {
+  for (const id of ['printReceiptBtn', 'printStatus']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
+  }
+  assert.match(html, /Imprimir ticket/);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /Printer\.printReceipt/);
+  assert.match(app, /import \* as Printer from '\.\/printer\.js'/);
+});

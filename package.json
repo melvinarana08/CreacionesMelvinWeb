@@ -13,7 +13,7 @@
     "test": "node --test",
     "seed": "node scripts/seed.js",
     "backup": "node scripts/backup.mjs",
-    "check": "node --check server/main.js && node --check server/app.js && node --check server/db.js && node --check server/store.js && node --check server/catalog.js && node --check server/money.js && node --check server/auth.js && node --check server/errors.js && node --check scripts/seed.js && node --check scripts/backup.mjs && node --check scripts/gen-icons.mjs && node --check public/app.js && node --check public/domain.js && node --check public/storage.js && node --check public/api.js && node --check public/sw.js"
+    "check": "node --check server/main.js && node --check server/app.js && node --check server/db.js && node --check server/store.js && node --check server/catalog.js && node --check server/money.js && node --check server/auth.js && node --check server/errors.js && node --check scripts/seed.js && node --check scripts/backup.mjs && node --check scripts/gen-icons.mjs && node --check public/app.js && node --check public/domain.js && node --check public/storage.js && node --check public/api.js && node --check public/printer.js && node --check public/sw.js"
   },
   "dependencies": {},
   "devDependencies": {}

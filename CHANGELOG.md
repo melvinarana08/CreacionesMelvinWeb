@@ -10,10 +10,12 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - Regla documentada en `docs/DECISIONS.md`: Git, decisiones y pruebas siguen siendo la fuente durable; Engram no guarda secretos, `.env` reales ni datos de ventas.
 - Botón **Consultar Precios** en la vista de venta (reemplaza al obsoleto "Actualizar precios"): abre un diálogo con la lista de precios vigentes y un filtro sencillo por producto o "Todos los productos". Refresca el catálogo desde el servidor cuando hay conexión; sin conexión muestra la caché local.
 - Botón **Volver a ventas** en la pantalla de login de administración, para salir del login sin recargar la página.
+- **Impresión térmica Bluetooth de tickets (58 mm ESC/POS)**: botón "Imprimir ticket" en el comprobante de venta. Usa Web Bluetooth API (Chrome/Edge Android) para conectar la impresora (MTP-II / PT-210) y enviar comandos ESC/POS directamente. Módulo `public/printer.js` con funciones puras testeables (`encodeText`, `formatItemLine`, `buildTicketBytes`) y conexión GATT.
 
 ### Corregido
 - Al pulsar **Salir** en el panel de administración, la sesión se cierra y la app regresa al panel principal de venta. Antes quedaba atrapada en la pantalla de login del admin, sin forma de volver a la venta.
 - La caché PWA sube a `cm-sales-v5` para distribuir los cambios del frontend (el service worker es cache-first para los assets; sin el bump, los clientes ejecutan el `app.js` anterior).
+- La caché PWA sube a `cm-sales-v6` para distribuir el módulo de impresión y el botón del comprobante.
 
 ### Sin cambios operativos
 - No se modificó API, esquema, catálogo ni despliegue en esta ventana.

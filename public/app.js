@@ -6,6 +6,7 @@
 import * as D from './domain.js';
 import * as S from './storage.js';
 import * as Api from './api.js';
+import * as Printer from './printer.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -276,6 +277,43 @@ function finalizeSale() {
       console.error('Fallo al guardar localmente:', e);
       showError('cartError', 'No se pudo guardar la venta en este dispositivo. Intenta de nuevo.');
     });
+}
+
+// ---------------- Impresión térmica Bluetooth ----------------
+
+function showPrintStatus(message, type = 'saving') {
+  const node = $('printStatus');
+  node.hidden = !message;
+  node.className = `status-text ${type}`;
+  node.textContent = message || '';
+}
+
+async function printCurrentReceipt() {
+  if (!state.receipt) return;
+  showPrintStatus('Conectando con la impresora…', 'saving');
+  const r = state.receipt;
+  const ticketData = {
+    title: r.folio ? `Folio ${r.folio}` : 'Ticket',
+    lines: r.lines.map((l) => ({
+      product: l.product,
+      size: l.size,
+      quantity: l.quantity,
+      unitPriceCents: l.unitPriceCents,
+      lineTotalCents: D.computeLineTotal(l.unitPriceCents, l.quantity),
+    })),
+    subtotalCents: r.subtotalCents,
+    discountCents: r.discountCents,
+    totalCents: r.totalCents,
+    folio: r.folio,
+    clientName: r.clientName,
+    date: r.savedAt,
+  };
+  const result = await Printer.printReceipt(ticketData);
+  if (result.ok) {
+    showPrintStatus('✅ Ticket impreso correctamente.', 'success');
+  } else {
+    showPrintStatus(`No se pudo imprimir: ${result.reason}`, 'failure');
+  }
 }
 
 function showReceipt() {
@@ -643,8 +681,10 @@ async function init() {
     renderCart();
   });
   $('finishBtn').addEventListener('click', finalizeSale);
+  $('printReceiptBtn').addEventListener('click', printCurrentReceipt);
   $('newSaleBtn').addEventListener('click', () => {
     state.receipt = null;
+    showPrintStatus(null);
     $('receiptView').hidden = true;
     $('saleView').hidden = false;
     renderCart();

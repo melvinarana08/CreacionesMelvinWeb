@@ -168,6 +168,9 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .receipt-line { display: flex; justify-content: space-between; gap: .5rem; font-size: .9rem; padding: .15rem 0; }
 .receipt-total { font-weight: 800; font-size: 1.1rem; border-top: 1px solid var(--border); margin-top: .5rem; padding-top: .5rem; }
 
+.receipt-actions { display: flex; gap: .6rem; margin-top: .75rem; }
+.receipt-actions .btn { flex: 1; padding: .7rem; font-size: .95rem; border-radius: var(--radius); }
+
 .tabs { display: flex; gap: .3rem; margin: .75rem 0; }
 .tab {
   font: inherit;

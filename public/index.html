@@ -67,7 +67,11 @@
     <h2>Comprobante</h2>
     <p class="receipt-status" id="receiptStatus" role="status"></p>
     <div id="receiptBody" class="receipt-body"></div>
-    <button type="button" id="newSaleBtn" class="btn btn-primary btn-big">Nueva venta</button>
+    <p id="printStatus" class="status-text" role="status" hidden></p>
+    <div class="receipt-actions">
+      <button type="button" id="printReceiptBtn" class="btn">🖨️ Imprimir ticket</button>
+      <button type="button" id="newSaleBtn" class="btn btn-primary">Nueva venta</button>
+    </div>
   </section>
 
   <!-- ============ ADMINISTRACIÓN ============ -->

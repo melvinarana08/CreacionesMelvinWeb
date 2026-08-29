@@ -1,6 +1,6 @@
 // sw.js — service worker offline-first (app shell en caché).
 // API: nunca se cachea (la cola local de IndexedDB cubre el offline).
-const CACHE = 'cm-sales-v5';
+const CACHE = 'cm-sales-v6';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -9,6 +9,7 @@ const PRECACHE = [
   '/domain.js',
   '/storage.js',
   '/api.js',
+  '/printer.js',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
