@@ -39,7 +39,7 @@ test('centerLine: centra texto a 32 columnas', () => {
   assert.equal(centerLine('').length, 32);
 });
 
-test('formatItemLine: formato "Producto (Talla) xCant    $Total"', () => {
+test('formatItemLine: muestra cantidad, precio unitario y total', () => {
   const line = {
     product: 'Camisas',
     size: 10,
@@ -51,6 +51,7 @@ test('formatItemLine: formato "Producto (Talla) xCant    $Total"', () => {
   assert.match(out, /Camisas/);
   assert.match(out, /T10/);
   assert.match(out, /x2/);
+  assert.match(out, /\$6\.00 c\/u/);
   assert.match(out, /\$12\.00/);
 });
 

@@ -33,6 +33,12 @@ test('el login verifica que la cookie de sesión quedó activa antes de abrir ad
   assert.match(app, /navegador no conservó la sesión/i);
 });
 
+test('carrito, comprobante y detalle muestran el precio unitario de cada línea', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  const uses = app.match(/D\.formatUnitPriceSummary\(/g) || [];
+  assert.ok(uses.length >= 3, `se esperaban al menos 3 usos, se encontraron ${uses.length}`);
+});
+
 test('salir de administración regresa al panel de venta y el login permite volver', () => {
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
   assert.match(app, /adminLogoutBtn[\s\S]*showSaleView\(\)/, 'Salir debe volver a la vista de venta');

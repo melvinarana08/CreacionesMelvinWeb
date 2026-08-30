@@ -133,6 +133,17 @@ test('formatUSD del frontend coincide con el del servidor', () => {
   assert.equal(D.formatUSD(0), '$0.00');
 });
 
+test('formatUnitPriceSummary muestra talla, cantidad y precio unitario explícito', () => {
+  assert.equal(
+    D.formatUnitPriceSummary({ size: 10, quantity: 2, unitPriceCents: 600 }),
+    'Talla 10 · Cantidad 2 · Unitario $6.00'
+  );
+  assert.equal(
+    D.formatUnitPriceSummary({ size: 'XL', quantity: 1, unitPriceCents: 1225 }),
+    'Talla XL · Cantidad 1 · Unitario $12.25'
+  );
+});
+
 test('priceRowsFromCatalog filtra por producto o devuelve todos sin mutar', () => {
   const catalog = [
     { name: 'Short', sizes: [{ size: 10, priceCents: 650 }, { size: 12, priceCents: 700 }] },

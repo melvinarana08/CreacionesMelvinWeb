@@ -131,6 +131,11 @@ export function formatUSD(cents) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/** Texto visible para explicar cantidad y precio unitario sin confundirlo con el total de línea. */
+export function formatUnitPriceSummary(line) {
+  return `Talla ${line.size} · Cantidad ${line.quantity} · Unitario ${formatUSD(line.unitPriceCents)}`;
+}
+
 /**
  * Filas de precios para la consulta pública: el producto indicado por nombre,
  * o todos si filterName está vacío. Conserva el orden del catálogo y no lo muta.

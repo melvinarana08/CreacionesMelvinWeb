@@ -15,9 +15,12 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - **Web Bluetooth requiere HTTPS**: `isWebBluetoothAvailable` verifica `window.isSecureContext` y el mensaje de error guía a la URL HTTPS de Tailscale Serve (`gym-node-02.tail4a98b6.ts.net`), que es el secure context necesario.
 
 ### Corregido
+- Carrito, comprobante, detalle administrativo y ticket térmico muestran explícitamente el
+  precio unitario (`c/u`) además del total de cada línea.
 - Al pulsar **Salir** en el panel de administración, la sesión se cierra y la app regresa al panel principal de venta. Antes quedaba atrapada en la pantalla de login del admin, sin forma de volver a la venta.
 - La caché PWA sube a `cm-sales-v5` para distribuir los cambios del frontend (el service worker es cache-first para los assets; sin el bump, los clientes ejecutan el `app.js` anterior).
 - La caché PWA sube a `cm-sales-v6` para distribuir el módulo de impresión y el botón del comprobante.
+- La caché PWA sube a `cm-sales-v10` para distribuir la presentación explícita del precio unitario.
 
 ### Sin cambios operativos
 - No se modificó API, esquema, catálogo ni despliegue en esta ventana.

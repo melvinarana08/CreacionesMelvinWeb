@@ -71,7 +71,7 @@ export function centsToText(cents) {
 
 /**
  * Formatea una línea de producto del ticket:
- * "Producto (Talla) x3    $12.00"
+ * "Producto (Talla) x3" + segunda línea con "$unitario c/u    $total".
  * @param {{product:string, size:(number|string), quantity:number, unitPriceCents:number, lineTotalCents:number}} line
  * @returns {string}
  */
@@ -79,13 +79,10 @@ export function formatItemLine(line) {
   if (!line || typeof line.product !== 'string' || line.product.trim() === '') return '';
   if (line.size == null || line.quantity == null || line.lineTotalCents == null) return '';
   const desc = `${line.product} (T${line.size}) x${line.quantity}`;
-  const price = `$${centsToText(line.lineTotalCents)}`;
-  const space = Math.max(1, COLS - desc.length - price.length);
-  if (desc.length + price.length >= COLS) {
-    // Si no cabe, el precio va en la siguiente línea
-    return desc + '\n' + ' '.repeat(COLS - price.length) + price;
-  }
-  return desc + ' '.repeat(space) + price;
+  const unit = `$${centsToText(line.unitPriceCents)} c/u`;
+  const total = `$${centsToText(line.lineTotalCents)}`;
+  const space = Math.max(1, COLS - unit.length - total.length);
+  return `${desc}\n${unit}${' '.repeat(space)}${total}`;
 }
 
 /**

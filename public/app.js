@@ -44,7 +44,7 @@ function renderCart() {
   for (const line of D.groupLinesByProduct(state.cart)) {
     const li = el('li', 'cart-item');
     const info = el('div', 'cart-item-info');
-    info.append(el('div', 'cart-item-name', line.product), el('div', 'cart-item-sub', `Talla ${line.size} · ${line.quantity} × ${D.formatUSD(line.unitPriceCents)}`));
+    info.append(el('div', 'cart-item-name', line.product), el('div', 'cart-item-sub', D.formatUnitPriceSummary(line)));
     const price = el('div', 'cart-item-price', D.formatUSD(D.computeLineTotal(line.unitPriceCents, line.quantity)));
     const rm = el('button', 'remove-btn', '✕');
     rm.setAttribute('aria-label', `Quitar ${line.product} talla ${line.size}`);
@@ -335,7 +335,7 @@ function renderReceipt() {
   if (r.clientName) body.append(el('p', 'muted', `Cliente: ${r.clientName}`));
   for (const line of r.lines) {
     const row = el('div', 'receipt-line');
-    const desc = el('span', null, `${line.product} (talla ${line.size}) × ${line.quantity}`);
+    const desc = el('span', null, `${line.product} · ${D.formatUnitPriceSummary(line)}`);
     const price = el('span', null, D.formatUSD(D.computeLineTotal(line.unitPriceCents, line.quantity)));
     row.append(desc, price);
     body.append(row);
@@ -418,7 +418,7 @@ async function loadAdminSales() {
     li.append(sub);
     for (const item of sale.items) {
       const line = el('div', 'admin-item-sub');
-      line.textContent = `${item.productName} (talla ${item.size}) × ${item.quantity} — ${D.formatUSD(item.unitPriceCents)} c/u`;
+      line.textContent = `${item.productName} · ${D.formatUnitPriceSummary(item)}`;
       li.append(line);
     }
     if (sale.status === 'voided') {
@@ -476,7 +476,7 @@ function openSaleDetail(sale) {
   body.append(el('div', 'receipt-sep', '-'.repeat(32)));
   for (const item of sale.items) {
     const line = el('div', 'receipt-line');
-    const desc = el('span', null, `${item.productName} (T${item.size}) ×${item.quantity}`);
+    const desc = el('span', null, `${item.productName} · ${D.formatUnitPriceSummary(item)}`);
     const price = el('span', null, D.formatUSD(D.computeLineTotal(item.unitPriceCents, item.quantity)));
     line.append(desc, price);
     body.append(line);
@@ -848,7 +848,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v9';
+  const swVersion = 'v10';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

@@ -23,6 +23,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 - Cliente opcional: un solo campo (nombre o teléfono).
 - Descuento manual: no negativo y ≤ subtotal.
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
+- Cada línea muestra de forma explícita **cantidad, precio unitario y total de línea** en el
+  carrito, el comprobante, el detalle administrativo y el ticket térmico.
 - Las líneas del carrito, la venta guardada y el comprobante se agrupan automáticamente
   por categoría/producto, aunque se hayan seleccionado intercaladas con otras categorías.
 - **Offline-first:** la venta se guarda primero en IndexedDB (cola local), el último catálogo
