@@ -55,6 +55,18 @@ test('formatItemLine: muestra cantidad, precio unitario y total', () => {
   assert.match(out, /\$12\.00/);
 });
 
+test('formatItemLine: separa el prefijo T de una talla en letras', () => {
+  const out = formatItemLine({
+    product: 'Camisas',
+    size: 'M',
+    quantity: 1,
+    unitPriceCents: 600,
+    lineTotalCents: 600,
+  });
+  assert.match(out, /\(T M\)/);
+  assert.doesNotMatch(out, /\(TM\)/);
+});
+
 test('formatItemLine: línea larga separa descripción y precio', () => {
   const line = {
     product: 'Pantalones Largos',

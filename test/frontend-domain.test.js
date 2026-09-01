@@ -59,16 +59,18 @@ test('buildSalePayload construye el payload con snapshot de precios', () => {
   assert.deepEqual(r.payload.lines, [{ product: 'Short', size: 10, quantity: 2, unitPriceCents: 650 }]);
 });
 
-test('groupLinesByProduct agrupa categorías sin depender del orden de selección', () => {
+test('groupLinesByProduct agrupa categorías y ordena tallas numéricas antes de letras', () => {
   const lines = [
-    { product: 'Pantalones', size: 10, quantity: 1, unitPriceCents: 800 },
+    { product: 'Pantalones', size: 12, quantity: 1, unitPriceCents: 850 },
     { product: 'Camisas', size: 'M', quantity: 1, unitPriceCents: 600 },
-    { product: 'Pantalones', size: 12, quantity: 2, unitPriceCents: 850 },
-    { product: 'Camisas', size: 'L', quantity: 1, unitPriceCents: 650 },
+    { product: 'Pantalones', size: 'XL', quantity: 1, unitPriceCents: 900 },
+    { product: 'Pantalones', size: 4, quantity: 1, unitPriceCents: 700 },
+    { product: 'Camisas', size: 'S', quantity: 1, unitPriceCents: 550 },
+    { product: 'Pantalones', size: 10, quantity: 2, unitPriceCents: 800 },
   ];
 
-  assert.deepEqual(D.groupLinesByProduct(lines), [lines[0], lines[2], lines[1], lines[3]]);
-  assert.deepEqual(lines.map((line) => line.size), [10, 'M', 12, 'L'], 'no muta el carrito original');
+  assert.deepEqual(D.groupLinesByProduct(lines), [lines[3], lines[5], lines[0], lines[2], lines[1], lines[4]]);
+  assert.deepEqual(lines.map((line) => line.size), [12, 'M', 'XL', 4, 'S', 10], 'no muta el carrito original');
 });
 
 test('buildSalePayload guarda las líneas agrupadas por categoría', () => {

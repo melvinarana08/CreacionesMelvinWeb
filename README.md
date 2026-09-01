@@ -25,6 +25,10 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
 - Cada línea muestra de forma explícita **cantidad, precio unitario y total de línea** en el
   carrito, el comprobante, el detalle administrativo y el ticket térmico.
+- El producto activo queda resaltado; las tallas se muestran con números de menor a mayor
+  antes de las tallas de letras, y **Consultar precios** usa un control visual diferenciado.
+- En el ticket térmico, las tallas de letras se imprimen con separación (`T M`) para evitar
+  confundir el prefijo de talla con su valor.
 - Las líneas del carrito, la venta guardada y el comprobante se agrupan automáticamente
   por categoría/producto, aunque se hayan seleccionado intercaladas con otras categorías.
 - **Offline-first:** la venta se guarda primero en IndexedDB (cola local), el último catálogo

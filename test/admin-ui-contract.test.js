@@ -46,12 +46,21 @@ test('salir de administración regresa al panel de venta y el login permite volv
   assert.ok(html.includes('id="adminBackBtn"'), 'falta el botón Volver a ventas');
 });
 
-test('consultar precios reemplaza el botón obsoleto y es filtrable', () => {
+test('el producto seleccionado queda resaltado y expone su estado accesible', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /state\.selectedCategory === product\.name[^\n]*selected/);
+  assert.match(app, /aria-pressed[^\n]*state\.selectedCategory === product\.name/);
+  assert.match(css, /\.category-list \.btn\.selected/);
+});
+
+test('consultar precios se distingue visualmente de los botones de productos', () => {
   assert.ok(!html.includes('refreshCatalogBtn'), 'el botón obsoleto Actualizar precios debe desaparecer');
   for (const id of ['pricesBtn', 'pricesDialog', 'pricesFilter', 'pricesList', 'closePricesBtn']) {
     assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
   }
-  assert.match(html, />Consultar Precios</);
+  assert.match(html, /id="pricesBtn"[^>]*class="[^"]*btn-price-lookup[^"]*"[^>]*>[\s\S]*Consultar precios/i);
+  assert.match(css, /\.btn-price-lookup\s*\{/);
+  assert.match(css, /\.btn-price-lookup[^}]*border-radius:\s*(?!999px)/s);
 });
 
 test('el comprobante tiene botón de impresión térmica Bluetooth', () => {

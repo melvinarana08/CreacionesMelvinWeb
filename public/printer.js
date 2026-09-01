@@ -78,7 +78,8 @@ export function centsToText(cents) {
 export function formatItemLine(line) {
   if (!line || typeof line.product !== 'string' || line.product.trim() === '') return '';
   if (line.size == null || line.quantity == null || line.lineTotalCents == null) return '';
-  const desc = `${line.product} (T${line.size}) x${line.quantity}`;
+  const sizePrefix = typeof line.size === 'string' ? 'T ' : 'T';
+  const desc = `${line.product} (${sizePrefix}${line.size}) x${line.quantity}`;
   const unit = `$${centsToText(line.unitPriceCents)} c/u`;
   const total = `$${centsToText(line.lineTotalCents)}`;
   const space = Math.max(1, COLS - unit.length - total.length);

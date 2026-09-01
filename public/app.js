@@ -84,9 +84,13 @@ function renderCatalog() {
   const list = $('categoryList');
   list.replaceChildren();
   for (const product of state.catalog) {
-    const btn = el('button', 'btn', product.name);
+    const btn = el('button', 'btn' + (state.selectedCategory === product.name ? ' selected' : ''), product.name);
     btn.type = 'button';
-    btn.addEventListener('click', () => openPicker(product));
+    btn.setAttribute('aria-pressed', String(state.selectedCategory === product.name));
+    btn.addEventListener('click', () => {
+      openPicker(product);
+      renderCatalog();
+    });
     list.append(btn);
   }
   if (state.selectedCategory) {
@@ -848,7 +852,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v10';
+  const swVersion = 'v11';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

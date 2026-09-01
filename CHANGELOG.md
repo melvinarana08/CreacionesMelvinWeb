@@ -15,15 +15,22 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - **Web Bluetooth requiere HTTPS**: `isWebBluetoothAvailable` verifica `window.isSecureContext` y el mensaje de error guía a la URL HTTPS de Tailscale Serve (`gym-node-02.tail4a98b6.ts.net`), que es el secure context necesario.
 
 ### Corregido
+- El producto seleccionado ahora queda resaltado y anuncia su estado con `aria-pressed`.
+- Dentro de cada producto, las tallas numéricas se ordenan de menor a mayor y aparecen antes
+  que las tallas de letras, sin mutar el carrito original.
+- **Consultar precios** usa un botón rectangular con icono y estilo propio para no confundirse
+  con los botones redondos de productos.
+- El ticket térmico separa el prefijo de las tallas de letras (`T M` en vez de `TM`).
 - Carrito, comprobante, detalle administrativo y ticket térmico muestran explícitamente el
   precio unitario (`c/u`) además del total de cada línea.
 - Al pulsar **Salir** en el panel de administración, la sesión se cierra y la app regresa al panel principal de venta. Antes quedaba atrapada en la pantalla de login del admin, sin forma de volver a la venta.
 - La caché PWA sube a `cm-sales-v5` para distribuir los cambios del frontend (el service worker es cache-first para los assets; sin el bump, los clientes ejecutan el `app.js` anterior).
 - La caché PWA sube a `cm-sales-v6` para distribuir el módulo de impresión y el botón del comprobante.
 - La caché PWA sube a `cm-sales-v10` para distribuir la presentación explícita del precio unitario.
+- La caché PWA sube a `cm-sales-v11` para distribuir las mejoras de selección, orden y presentación.
 
-### Sin cambios operativos
-- No se modificó API, esquema, catálogo ni despliegue en esta ventana.
+### Sin cambios de backend
+- No se modificó API, esquema SQLite ni catálogo persistido; esta ventana solo cambia presentación y orden del frontend.
 
 ## [0.1.0] — 2026-08-24
 

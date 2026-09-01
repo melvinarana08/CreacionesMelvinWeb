@@ -36,7 +36,9 @@ export function computeSubtotal(lines) {
 
 /**
  * Agrupa líneas por categoría/producto conservando el orden en que apareció
- * cada categoría y el orden de sus tallas. Devuelve un arreglo nuevo.
+ * cada categoría. Dentro de cada grupo coloca primero las tallas numéricas de
+ * menor a mayor y después las tallas de letras en su orden original.
+ * Devuelve un arreglo nuevo sin mutar las líneas recibidas.
  */
 export function groupLinesByProduct(lines) {
   if (!Array.isArray(lines)) return [];
@@ -46,7 +48,14 @@ export function groupLinesByProduct(lines) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(line);
   }
-  return [...groups.values()].flat();
+  return [...groups.values()].flatMap((group) => [...group].sort((a, b) => {
+    const aNumeric = typeof a?.size === 'number';
+    const bNumeric = typeof b?.size === 'number';
+    if (aNumeric && bNumeric) return a.size - b.size;
+    if (aNumeric) return -1;
+    if (bNumeric) return 1;
+    return 0;
+  }));
 }
 
 export function computeTotal(subtotalCents, discountCents) {
