@@ -249,3 +249,84 @@ test('createProductEditor exige nombre único y al menos una talla', () => {
   assert.equal(D.createProductEditor('camisas', [1], existing).ok, false);
   assert.equal(D.createProductEditor('Corbatines', [], existing).ok, false);
 });
+
+test('deleteProductFromEditor elimina producto y exige al menos un producto restante', () => {
+  const editor = [
+    { name: 'Pantalón', sizes: [{ size: 30, priceCents: 1000, priceInput: '10.00' }] },
+    { name: 'Camisa', sizes: [{ size: 'M', priceCents: 500, priceInput: '5.00' }] },
+  ];
+  const r = D.deleteProductFromEditor(editor, 'Pantalón');
+  assert.equal(r.ok, true);
+  assert.equal(r.editor.length, 1);
+  assert.equal(r.editor[0].name, 'Camisa');
+
+  // No permite dejar el catálogo vacío
+  const last = D.deleteProductFromEditor(r.editor, 'Camisa');
+  assert.equal(last.ok, false);
+  assert.match(last.reason, /al menos un producto/);
+});
+
+test('renameProductInEditor renombra producto y valida duplicados y longitud', () => {
+  const editor = [
+    { name: 'Pantalón', sizes: [{ size: 30, priceCents: 1000, priceInput: '10.00' }] },
+    { name: 'Camisa', sizes: [{ size: 'M', priceCents: 500, priceInput: '5.00' }] },
+  ];
+  const r = D.renameProductInEditor(editor, 'Pantalón', 'Pantalón de Vestir');
+  assert.equal(r.ok, true);
+  assert.equal(r.editor[0].name, 'Pantalón de Vestir');
+
+  // Rechaza nombre duplicado
+  const dup = D.renameProductInEditor(editor, 'Pantalón', 'camisa');
+  assert.equal(dup.ok, false);
+  assert.match(dup.reason, /Ya existe/);
+
+  // Rechaza nombre vacío
+  const empty = D.renameProductInEditor(editor, 'Pantalón', '   ');
+  assert.equal(empty.ok, false);
+});
+
+test('deleteSizeFromProduct elimina talla y asegura que quede al menos una', () => {
+  const editor = [
+    {
+      name: 'Camisa',
+      sizes: [
+        { size: 10, priceCents: 500, priceInput: '5.00' },
+        { size: 12, priceCents: 600, priceInput: '6.00' },
+      ],
+    },
+  ];
+  const r = D.deleteSizeFromProduct(editor, 'Camisa', 10);
+  assert.equal(r.ok, true);
+  assert.equal(r.editor[0].sizes.length, 1);
+  assert.equal(r.editor[0].sizes[0].size, 12);
+
+  // No permite borrar la última talla restante
+  const last = D.deleteSizeFromProduct(r.editor, 'Camisa', 12);
+  assert.equal(last.ok, false);
+  assert.match(last.reason, /al menos una talla/);
+});
+
+test('addSizeToProduct agrega talla normalizada y ordenada sin duplicados', () => {
+  const editor = [
+    {
+      name: 'Camisa',
+      sizes: [
+        { size: 10, priceCents: 500, priceInput: '5.00' },
+        { size: 'M', priceCents: 600, priceInput: '6.00' },
+      ],
+    },
+  ];
+  const r = D.addSizeToProduct(editor, 'Camisa', 12, '5.50');
+  assert.equal(r.ok, true);
+  assert.equal(r.editor[0].sizes.length, 3);
+  // Tallas ordenadas: 10, 12, 'M'
+  assert.equal(r.editor[0].sizes[0].size, 10);
+  assert.equal(r.editor[0].sizes[1].size, 12);
+  assert.equal(r.editor[0].sizes[1].priceCents, 550);
+  assert.equal(r.editor[0].sizes[2].size, 'M');
+
+  // Rechaza talla duplicada
+  const dup = D.addSizeToProduct(r.editor, 'Camisa', '10');
+  assert.equal(dup.ok, false);
+  assert.match(dup.reason, /ya existe/);
+});

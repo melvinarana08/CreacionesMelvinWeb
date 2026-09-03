@@ -240,14 +240,57 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .price-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: .6rem .75rem;
+  padding: .75rem;
   background: #fff;
+  display: grid;
+  gap: .6rem;
 }
-.price-card-title { margin: 0 0 .4rem; font-size: .95rem; }
-.price-rows { display: grid; gap: .35rem; }
+.price-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--border);
+}
+.price-card-title { margin: 0; font-size: 1rem; font-weight: 700; }
+.price-card-actions { display: flex; align-items: center; gap: .35rem; }
+.btn-danger-soft {
+  color: var(--danger);
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+.btn-danger-soft:active { background: #fee2e2; }
+.btn-rename-product { font-weight: 500; }
+.btn-delete-product { font-weight: 600; }
+.price-rows { display: grid; gap: .4rem; }
 .price-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.price-row label { font-size: .9rem; color: var(--text); }
-.price-row input { width: 110px; }
+.price-row label { font-size: .9rem; color: var(--text); font-weight: 500; }
+.price-input-group { display: flex; align-items: center; gap: .35rem; }
+.price-row input { width: 105px; }
+.btn-delete-size {
+  color: var(--danger);
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  font-size: .9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-delete-size:active { background: #fee2e2; }
+.price-card-footer {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: .3rem;
+  border-top: 1px dashed var(--border);
+}
+.btn-add-size { font-weight: 600; }
 .price-row-value { font-weight: 700; }
 #pricesFilter { width: 100%; margin: .25rem 0 .75rem; }
 .price-list { display: grid; gap: .6rem; }

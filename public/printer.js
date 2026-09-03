@@ -70,6 +70,20 @@ export function centsToText(cents) {
 }
 
 /**
+ * Alinea dos textos a los extremos de una línea de COLS columnas.
+ * @param {string} left
+ * @param {string} right
+ * @param {number} [cols=COLS]
+ * @returns {string}
+ */
+export function formatTwoCols(left, right, cols = COLS) {
+  const l = String(left || '');
+  const r = String(right || '');
+  const space = Math.max(1, cols - l.length - r.length);
+  return l + ' '.repeat(space) + r;
+}
+
+/**
  * Formatea una línea de producto del ticket:
  * "Producto (Talla) x3" + segunda línea con "$unitario c/u    $total".
  * @param {{product:string, size:(number|string), quantity:number, unitPriceCents:number, lineTotalCents:number}} line
@@ -97,17 +111,23 @@ export function buildTicketBytes(receipt) {
 
   push(INIT);
   push(ALIGN_CENTER);
+
+  // Encabezado de tienda en doble ancho y negrita
   push(BOLD_ON);
+  push(SIZE_DOUBLE_W);
   push(encodeText('Creaciones Melvin'));
   push([LF]);
-  push(BOLD_OFF);
   push(SIZE_NORMAL);
+  push(BOLD_OFF);
 
-  if (receipt.title) {
+  push(encodeText('COMPROBANTE DE VENTA'));
+  push([LF]);
+  if (receipt.title && receipt.title !== 'Ticket' && !receipt.title.startsWith('Folio')) {
     push(encodeText(receipt.title));
     push([LF]);
   }
 
+  push(encodeText('='.repeat(COLS)));
   push([LF]);
   push(ALIGN_LEFT);
 
@@ -126,8 +146,14 @@ export function buildTicketBytes(receipt) {
 
   push(encodeText('-'.repeat(COLS)));
   push([LF]);
+  push(encodeText(formatTwoCols('DESCRIPCION', 'TOTAL')));
+  push([LF]);
+  push(encodeText('-'.repeat(COLS)));
+  push([LF]);
 
+  let totalQty = 0;
   for (const line of receipt.lines) {
+    if (line && typeof line.quantity === 'number') totalQty += line.quantity;
     const formatted = formatItemLine(line);
     push(encodeText(formatted));
     push([LF]);
@@ -136,28 +162,39 @@ export function buildTicketBytes(receipt) {
   push(encodeText('-'.repeat(COLS)));
   push([LF]);
 
-  // Subtotal
-  const subLine = `Subtotal${' '.repeat(Math.max(1, COLS - 'Subtotal'.length - receipt.subtotalCents.toString().length))}$${centsToText(receipt.subtotalCents)}`;
-  push(encodeText(`Subtotal$${centsToText(receipt.subtotalCents)}`.padEnd(COLS)));
+  // Resumen de prendas
+  if (totalQty > 0) {
+    push(encodeText(formatTwoCols('Prendas vendidas:', String(totalQty))));
+    push([LF]);
+  }
+
+  // Subtotal perfectamente alineado a la derecha
+  push(encodeText(formatTwoCols('Subtotal', `$${centsToText(receipt.subtotalCents)}`)));
   push([LF]);
 
   if (receipt.discountCents > 0) {
-    push(encodeText(`Descuento -$${centsToText(receipt.discountCents)}`));
+    push(encodeText(formatTwoCols('Descuento', `-$${centsToText(receipt.discountCents)}`)));
     push([LF]);
   }
+
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
 
   // Total en doble alto + negrita
   push(BOLD_ON);
   push(SIZE_DOUBLE_H);
-  push(encodeText(`TOTAL: $${centsToText(receipt.totalCents)}`));
+  push(encodeText(formatTwoCols('TOTAL:', `$${centsToText(receipt.totalCents)}`)));
   push([LF]);
   push(SIZE_NORMAL);
   push(BOLD_OFF);
 
+  push(encodeText('='.repeat(COLS)));
   push([LF]);
+
   push(ALIGN_CENTER);
-  push(encodeText('Gracias por su compra'));
+  push(encodeText('¡Gracias por su compra!'));
   push([LF]);
+  push(encodeText('Conserve este comprobante'));
   push([LF]);
   push([LF]);
   push([LF]);

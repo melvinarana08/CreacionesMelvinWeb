@@ -580,25 +580,107 @@ function renderCatalogEditor() {
   for (const product of priceEditor) {
     const card = el('div', 'price-card');
     card.dataset.productName = product.name;
-    card.append(el('h4', 'price-card-title', product.name));
+
+    // Cabecera con título y acciones (Renombrar y Borrar producto)
+    const header = el('div', 'price-card-header');
+    const title = el('h4', 'price-card-title', product.name);
+    const actions = el('div', 'price-card-actions');
+
+    const renameBtn = el('button', 'btn btn-small btn-rename-product', '✏️ Renombrar');
+    renameBtn.type = 'button';
+    renameBtn.setAttribute('aria-label', `Renombrar producto ${product.name}`);
+    renameBtn.addEventListener('click', () => {
+      const newName = window.prompt(`Nuevo nombre para "${product.name}":`, product.name);
+      if (newName === null) return;
+      const res = D.renameProductInEditor(priceEditor, product.name, newName);
+      if (!res.ok) {
+        alert(`⚠️ ${res.reason}`);
+        return;
+      }
+      priceEditor = res.editor;
+      renderCatalogEditor();
+      showCatalogStatus('Hay cambios sin guardar.', 'saving');
+    });
+
+    const delProdBtn = el('button', 'btn btn-small btn-danger-soft btn-delete-product', '🗑️ Borrar');
+    delProdBtn.type = 'button';
+    delProdBtn.setAttribute('aria-label', `Eliminar producto ${product.name}`);
+    delProdBtn.addEventListener('click', () => {
+      if (!window.confirm(`¿Eliminar el producto "${product.name}" y todas sus tallas del catálogo?`)) return;
+      const res = D.deleteProductFromEditor(priceEditor, product.name);
+      if (!res.ok) {
+        alert(`⚠️ ${res.reason}`);
+        return;
+      }
+      priceEditor = res.editor;
+      renderCatalogEditor();
+      showCatalogStatus('Hay cambios sin guardar.', 'saving');
+    });
+
+    actions.append(renameBtn, delProdBtn);
+    header.append(title, actions);
+    card.append(header);
+
+    // Lista de tallas con input de precio y botón para borrar talla
     const rows = el('div', 'price-rows');
     for (const size of product.sizes) {
       const row = el('div', 'price-row');
       const label = el('label', null, `Talla ${size.size}`);
+      const group = el('div', 'price-input-group');
+
       const input = document.createElement('input');
       input.type = 'text';
       input.inputMode = 'decimal';
       input.value = size.priceInput;
       input.placeholder = '0.00';
       input.setAttribute('aria-label', `Precio talla ${size.size} de ${product.name}`);
+      input.addEventListener('focus', function () { this.select(); });
       input.addEventListener('input', () => {
         size.priceInput = input.value;
         showCatalogStatus('Hay cambios sin guardar.', 'saving');
       });
-      row.append(label, input);
+
+      const delSizeBtn = el('button', 'btn-delete-size', '✕');
+      delSizeBtn.type = 'button';
+      delSizeBtn.setAttribute('aria-label', `Quitar talla ${size.size} de ${product.name}`);
+      delSizeBtn.title = 'Eliminar esta talla';
+      delSizeBtn.addEventListener('click', () => {
+        const res = D.deleteSizeFromProduct(priceEditor, product.name, size.size);
+        if (!res.ok) {
+          alert(`⚠️ ${res.reason}`);
+          return;
+        }
+        priceEditor = res.editor;
+        renderCatalogEditor();
+        showCatalogStatus('Hay cambios sin guardar.', 'saving');
+      });
+
+      group.append(input, delSizeBtn);
+      row.append(label, group);
       rows.append(row);
     }
     card.append(rows);
+
+    // Pie de tarjeta para agregar una talla individual a este producto
+    const footer = el('div', 'price-card-footer');
+    const addSizeBtn = el('button', 'btn btn-small btn-add-size', '+ Talla');
+    addSizeBtn.type = 'button';
+    addSizeBtn.setAttribute('aria-label', `Agregar talla a ${product.name}`);
+    addSizeBtn.addEventListener('click', () => {
+      const raw = window.prompt(`Nueva talla para "${product.name}" (ej: 16, M, 22 o 4XL):`);
+      if (raw === null) return;
+      const res = D.addSizeToProduct(priceEditor, product.name, raw);
+      if (!res.ok) {
+        alert(`⚠️ ${res.reason}`);
+        return;
+      }
+      priceEditor = res.editor;
+      renderCatalogEditor();
+      showCatalogStatus('Hay cambios sin guardar.', 'saving');
+    });
+    footer.append(addSizeBtn);
+    card.append(footer);
+
     container.append(card);
   }
 }
@@ -905,7 +987,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v12';
+  const swVersion = 'v13';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

@@ -100,9 +100,21 @@ test('barra móvil flotante y layout responsivo de tablet están presentes', () 
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app.js están alineados en caché v12', () => {
+test('service worker y app.js están alineados en caché v13', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v12/);
-  assert.match(app, /swVersion = 'v12'/);
+  assert.match(sw, /cm-sales-v13/);
+  assert.match(app, /swVersion = 'v13'/);
+});
+
+test('controles para edición completa de catálogo (borrar, renombrar, gestionar tallas) existen en CSS y JS', () => {
+  assert.match(css, /\.btn-delete-product/);
+  assert.match(css, /\.btn-rename-product/);
+  assert.match(css, /\.btn-delete-size/);
+  assert.match(css, /\.btn-add-size/);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /deleteProductFromEditor/);
+  assert.match(app, /renameProductInEditor/);
+  assert.match(app, /deleteSizeFromProduct/);
+  assert.match(app, /addSizeToProduct/);
 });

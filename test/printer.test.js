@@ -7,6 +7,7 @@ import {
   encodeText,
   centerLine,
   centsToText,
+  formatTwoCols,
   formatItemLine,
   buildTicketBytes,
   isWebBluetoothAvailable,
@@ -143,4 +144,39 @@ test('buildTicketBytes: termina con comando de corte (GS V 0)', () => {
 
 test('isWebBluetoothAvailable: devuelve false en Node (sin window/navigator.bluetooth)', () => {
   assert.equal(isWebBluetoothAvailable(), false);
+});
+
+test('formatTwoCols: alinea textos a los extremos de una línea de 32 columnas', () => {
+  const line = formatTwoCols('Subtotal', '$12.50');
+  assert.equal(line.length, 32);
+  assert.ok(line.startsWith('Subtotal'));
+  assert.ok(line.endsWith('$12.50'));
+
+  // Maneja nulos y números
+  const num = formatTwoCols('Prendas:', 5);
+  assert.equal(num.length, 32);
+  assert.ok(num.endsWith('5'));
+});
+
+test('buildTicketBytes: incluye encabezado mejorado, columnas y prendas vendidas', () => {
+  const receipt = {
+    lines: [
+      { product: 'Short', size: 10, quantity: 2, unitPriceCents: 650, lineTotalCents: 1300 },
+      { product: 'Camisa', size: 'M', quantity: 1, unitPriceCents: 500, lineTotalCents: 500 },
+    ],
+    subtotalCents: 1800,
+    discountCents: 200,
+    totalCents: 1600,
+    folio: 99,
+    date: '2026-09-03 15:00',
+  };
+  const text = new TextDecoder().decode(buildTicketBytes(receipt));
+  assert.match(text, /Creaciones Melvin/);
+  assert.match(text, /COMPROBANTE DE VENTA/);
+  assert.match(text, /DESCRIPCION.*TOTAL/);
+  assert.match(text, /Prendas vendidas:.*3/);
+  assert.match(text, /Subtotal.*\$18\.00/);
+  assert.match(text, /Descuento.*-\$2\.00/);
+  assert.match(text, /TOTAL:.*\$16\.00/);
+  assert.match(text, /¡Gracias por su compra!/);
 });

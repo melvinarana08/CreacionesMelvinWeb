@@ -5,13 +5,24 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Edición completa del catálogo en administración**:
+  - **Borrado de productos**: botón *"🗑️ Borrar"* por producto con confirmación segura para eliminar prendas creadas por error.
+  - **Renombrado de productos**: botón *"✏️ Renombrar"* para corregir nombres de productos directamente en la interfaz.
+  - **Gestión individual de tallas**: botón *"✕"* en cada fila de talla para quitar tallas no deseadas (garantizando que el producto conserve al menos una talla).
+  - **Agregar talla a producto existente**: botón *"+ Talla"* en cada tarjeta de producto para incorporar tallas adicionales fácilmente.
+- **Rediseño del ticket térmico ESC/POS (58 mm)**:
+  - Nueva función de alineación a 2 columnas `formatTwoCols` para alinear limpiamente subtotales, descuentos y total a la derecha.
+  - Título `Creaciones Melvin` centrado y en doble ancho (`SIZE_DOUBLE_W` + `BOLD_ON`).
+  - Cabecera de columnas `DESCRIPCION` y `TOTAL` con separadores estructurados.
+  - Resumen explícito de volumen: `Prendas vendidas: N` antes de los totales monetarios.
+  - Cierre con `¡Gracias por su compra!` y `Conserve este comprobante`.
+- **Caché PWA actualizada a `cm-sales-v13`** para distribución inmediata en dispositivos móviles.
 - **Layout adaptativo para tablets y pantallas medianas (≥ 768px)**: diseño de 2 columnas estilo estación POS de mostrador, manteniendo el catálogo y selector a la izquierda y el carrito con totales anclado de forma fija (*sticky*) a la derecha.
 - **Barra flotante inferior en celulares**: resumen rápido visible cuando hay prendas en el carrito, con contador de prendas, monto total y botón de desplazamiento suave directo al cobro.
 - **Micro-interacciones y ergonomía táctil**: zonas de toque mínimas de 48×48px en selector de cantidad, vibración háptica sutil en dispositivos compatibles y animación visual de pulso al agregar prendas al carrito.
 - **Reset automático de cantidad a 1** tras presionar *Agregar*, evitando compras accidentales con cantidades previas.
 - **Auto-selección en campo de descuento**: enfocar el input de descuento selecciona todo el texto para escribir un nuevo monto sin borrar dígito a dígito en teclado móvil.
 - **Alternar visibilidad de contraseña**: botón con icono (ojo) para mostrar u ocultar la clave en el login de administración.
-- Actualización de caché PWA a `cm-sales-v12` para despliegue y actualización inmediata en navegadores móviles.
 - Memoria operativa por proyecto con Engram: `.engram/config.json` fija la identidad `creaciones-melvin` para consultas, decisiones y contexto recuperable entre sesiones.
 - Workflow de agentes `creaciones-change-workflow` (`.hermes/skills/`): routing orgánico y cuatro etapas (propuesta, contrato, tareas/implementación, verificación/cierre) con carga bajo demanda. Inspirado en Organic Routing y SDD de Gentle AI; no incorpora la persona, RDD ni el orquestador completo.
 - Regla documentada en `docs/DECISIONS.md`: Git, decisiones y pruebas siguen siendo la fuente durable; Engram no guarda secretos, `.env` reales ni datos de ventas.

@@ -248,3 +248,94 @@ export function createProductEditor(nameInput, selectedSizes, existingEditor = [
   if (sizes.length === 0) return { ok: false, reason: 'Selecciona al menos una talla' };
   return { ok: true, product: { name, sizes } };
 }
+
+const STANDARD_SIZE_ORDER = new Map([...STANDARD_SIZE_LABELS.values()].map((size, index) => [size, index]));
+
+export function compareSizes(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'number') return -1;
+  if (typeof b === 'number') return 1;
+  const ai = STANDARD_SIZE_ORDER.get(a);
+  const bi = STANDARD_SIZE_ORDER.get(b);
+  if (ai !== undefined || bi !== undefined) {
+    if (ai === undefined) return 1;
+    if (bi === undefined) return -1;
+    return ai - bi;
+  }
+  return String(a).localeCompare(String(b), 'es', { sensitivity: 'base', numeric: true });
+}
+
+/** Elimina un producto del modelo editable, validando que el catálogo conserve al menos 1 producto. */
+export function deleteProductFromEditor(editor, productName) {
+  if (!Array.isArray(editor)) return { ok: false, reason: 'Editor inválido' };
+  const target = typeof productName === 'string' ? productName.trim().toLocaleLowerCase('es') : '';
+  const idx = editor.findIndex((p) => p.name.trim().toLocaleLowerCase('es') === target);
+  if (idx < 0) return { ok: false, reason: 'Producto no encontrado' };
+  if (editor.length <= 1) {
+    return { ok: false, reason: 'El catálogo debe tener al menos un producto' };
+  }
+  const next = editor.filter((_, i) => i !== idx);
+  return { ok: true, editor: next };
+}
+
+/** Renombra un producto en el modelo editable validando unicidad y formato. */
+export function renameProductInEditor(editor, oldName, newNameInput) {
+  if (!Array.isArray(editor)) return { ok: false, reason: 'Editor inválido' };
+  const oldTarget = typeof oldName === 'string' ? oldName.trim().toLocaleLowerCase('es') : '';
+  const newName = typeof newNameInput === 'string' ? newNameInput.trim() : '';
+  if (!newName) return { ok: false, reason: 'Escribe el nuevo nombre del producto' };
+  if (newName.length > 80) return { ok: false, reason: 'El nombre del producto es demasiado largo' };
+  const idx = editor.findIndex((p) => p.name.trim().toLocaleLowerCase('es') === oldTarget);
+  if (idx < 0) return { ok: false, reason: 'Producto no encontrado' };
+  const newTarget = newName.toLocaleLowerCase('es');
+  if (newTarget !== oldTarget && editor.some((p) => p.name.trim().toLocaleLowerCase('es') === newTarget)) {
+    return { ok: false, reason: `Ya existe un producto llamado ${newName}` };
+  }
+  const next = editor.map((p, i) => (i === idx ? { ...p, name: newName } : p));
+  return { ok: true, editor: next };
+}
+
+/** Elimina una talla de un producto asegurando que conserve al menos una talla. */
+export function deleteSizeFromProduct(editor, productName, sizeToDelete) {
+  if (!Array.isArray(editor)) return { ok: false, reason: 'Editor inválido' };
+  const target = typeof productName === 'string' ? productName.trim().toLocaleLowerCase('es') : '';
+  const prod = editor.find((p) => p.name.trim().toLocaleLowerCase('es') === target);
+  if (!prod) return { ok: false, reason: 'Producto no encontrado' };
+  if (prod.sizes.length <= 1) {
+    return { ok: false, reason: 'El producto debe tener al menos una talla. Si deseas quitar el producto completo, usa "Borrar producto".' };
+  }
+  const normalized = normalizeSizeInput(sizeToDelete);
+  if (normalized === null) return { ok: false, reason: 'Talla inválida' };
+  const key = sizeKey(normalized);
+  const sizeExists = prod.sizes.some((s) => sizeKey(s.size) === key);
+  if (!sizeExists) return { ok: false, reason: 'Talla no encontrada en este producto' };
+  const next = editor.map((p) => {
+    if (p.name.trim().toLocaleLowerCase('es') !== target) return p;
+    return { ...p, sizes: p.sizes.filter((s) => sizeKey(s.size) !== key) };
+  });
+  return { ok: true, editor: next };
+}
+
+/** Agrega una nueva talla a un producto existente en el modelo editable. */
+export function addSizeToProduct(editor, productName, rawSize, defaultPriceInput = '') {
+  if (!Array.isArray(editor)) return { ok: false, reason: 'Editor inválido' };
+  const target = typeof productName === 'string' ? productName.trim().toLocaleLowerCase('es') : '';
+  const prod = editor.find((p) => p.name.trim().toLocaleLowerCase('es') === target);
+  if (!prod) return { ok: false, reason: 'Producto no encontrado' };
+  const size = normalizeSizeInput(rawSize);
+  if (size === null) return { ok: false, reason: 'Escribe una talla válida (por ejemplo: 16, M, 22 o 4XL)' };
+  const key = sizeKey(size);
+  if (prod.sizes.some((s) => sizeKey(s.size) === key)) {
+    return { ok: false, reason: `La talla ${size} ya existe en ${prod.name}` };
+  }
+  const priceNum = Number(defaultPriceInput);
+  const priceCents = Number.isFinite(priceNum) && priceNum >= 0 ? Math.round(priceNum * 100) : 0;
+  const newSize = {
+    size,
+    priceCents,
+    priceInput: defaultPriceInput ? String(defaultPriceInput) : '',
+  };
+  const updatedSizes = [...prod.sizes, newSize].sort((a, b) => compareSizes(a.size, b.size));
+  const next = editor.map((p) => (p.name.trim().toLocaleLowerCase('es') === target ? { ...p, sizes: updatedSizes } : p));
+  return { ok: true, editor: next };
+}
