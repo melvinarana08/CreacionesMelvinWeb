@@ -60,6 +60,15 @@
         <button type="button" id="finishBtn" class="btn btn-primary btn-big">Finalizar venta</button>
       </div>
     </section>
+
+    <!-- Barra flotante móvil para acceso rápido al total/carrito -->
+    <div id="mobileCartBar" class="mobile-cart-bar" hidden>
+      <div class="mobile-cart-info">
+        <span id="mobileCartCount" class="mobile-cart-count">0 prendas</span>
+        <span id="mobileCartTotal" class="mobile-cart-total">$0.00</span>
+      </div>
+      <button type="button" id="mobileCartBtn" class="btn">Ver venta ↓</button>
+    </div>
   </main>
 
   <!-- ============ COMPROBANTE ============ -->
@@ -81,7 +90,10 @@
       <p class="muted">Acceso restringido. Ingresa la contraseña de administrador.</p>
       <div class="meta-row">
         <label for="adminPasswordInput">Contraseña</label>
-        <input id="adminPasswordInput" type="password" autocomplete="current-password">
+        <div class="input-with-action">
+          <input id="adminPasswordInput" type="password" autocomplete="current-password">
+          <button type="button" id="togglePasswordBtn" class="btn-icon" aria-label="Mostrar u ocultar contraseña">👁️</button>
+        </div>
       </div>
       <p id="adminLoginError" class="error-text" role="alert" hidden></p>
       <div class="dialog-actions">

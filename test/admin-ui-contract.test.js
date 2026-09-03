@@ -90,3 +90,19 @@ test('el footer muestra la versión de la app y la caché del SW', () => {
   assert.match(app, /fetchHealth.*version|data\.version/);
   assert.match(css, /\.app-version/);
 });
+
+test('barra móvil flotante y layout responsivo de tablet están presentes', () => {
+  for (const id of ['mobileCartBar', 'mobileCartCount', 'mobileCartTotal', 'mobileCartBtn', 'togglePasswordBtn']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id} en index.html`);
+  }
+  assert.match(css, /\.mobile-cart-bar/);
+  assert.match(css, /@media\s*\(min-width:\s*768px\)\s*\{[\s\S]*#saleView\s*\{[\s\S]*grid-template-columns:/);
+  assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
+});
+
+test('service worker y app.js están alineados en caché v12', () => {
+  const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(sw, /cm-sales-v12/);
+  assert.match(app, /swVersion = 'v12'/);
+});

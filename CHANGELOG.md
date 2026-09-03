@@ -5,6 +5,13 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Layout adaptativo para tablets y pantallas medianas (≥ 768px)**: diseño de 2 columnas estilo estación POS de mostrador, manteniendo el catálogo y selector a la izquierda y el carrito con totales anclado de forma fija (*sticky*) a la derecha.
+- **Barra flotante inferior en celulares**: resumen rápido visible cuando hay prendas en el carrito, con contador de prendas, monto total y botón de desplazamiento suave directo al cobro.
+- **Micro-interacciones y ergonomía táctil**: zonas de toque mínimas de 48×48px en selector de cantidad, vibración háptica sutil en dispositivos compatibles y animación visual de pulso al agregar prendas al carrito.
+- **Reset automático de cantidad a 1** tras presionar *Agregar*, evitando compras accidentales con cantidades previas.
+- **Auto-selección en campo de descuento**: enfocar el input de descuento selecciona todo el texto para escribir un nuevo monto sin borrar dígito a dígito en teclado móvil.
+- **Alternar visibilidad de contraseña**: botón con icono (ojo) para mostrar u ocultar la clave en el login de administración.
+- Actualización de caché PWA a `cm-sales-v12` para despliegue y actualización inmediata en navegadores móviles.
 - Memoria operativa por proyecto con Engram: `.engram/config.json` fija la identidad `creaciones-melvin` para consultas, decisiones y contexto recuperable entre sesiones.
 - Workflow de agentes `creaciones-change-workflow` (`.hermes/skills/`): routing orgánico y cuatro etapas (propuesta, contrato, tareas/implementación, verificación/cierre) con carga bajo demanda. Inspirado en Organic Routing y SDD de Gentle AI; no incorpora la persona, RDD ni el orquestador completo.
 - Regla documentada en `docs/DECISIONS.md`: Git, decisiones y pruebas siguen siendo la fuente durable; Engram no guarda secretos, `.env` reales ni datos de ventas.

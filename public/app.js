@@ -65,6 +65,15 @@ function renderCart() {
   $('totalVal').textContent = D.formatUSD(total);
   $('finishBtn').disabled = state.cart.length === 0 || !discountValid.ok;
   showError('cartError', discountValid.ok ? null : discountValid.reason);
+
+  const bar = $('mobileCartBar');
+  if (bar) {
+    const isSaleVisible = !$('saleView').hidden;
+    bar.hidden = !isSaleVisible || state.cart.length === 0;
+    const totalQty = state.cart.reduce((sum, l) => sum + l.quantity, 0);
+    $('mobileCartCount').textContent = `${totalQty} prenda${totalQty === 1 ? '' : 's'}`;
+    $('mobileCartTotal').textContent = D.formatUSD(total);
+  }
 }
 
 function showError(id, message) {
@@ -324,6 +333,8 @@ function showReceipt() {
   $('saleView').hidden = true;
   $('adminView').hidden = true;
   $('receiptView').hidden = false;
+  const bar = $('mobileCartBar');
+  if (bar) bar.hidden = true;
   renderReceipt();
 }
 
@@ -367,6 +378,8 @@ function showAdminLogin() {
   $('adminView').hidden = false;
   $('adminLogin').hidden = false;
   $('adminPanel').hidden = true;
+  const bar = $('mobileCartBar');
+  if (bar) bar.hidden = true;
 }
 
 /** Regresa al panel principal (venta). Usado al salir de administración o cancelar el login. */
@@ -374,6 +387,7 @@ function showSaleView() {
   $('adminView').hidden = true;
   $('receiptView').hidden = true;
   $('saleView').hidden = false;
+  renderCart();
 }
 
 function requireAdminLogin(message = 'Tu sesión de administración terminó. Inicia sesión nuevamente.') {
@@ -741,9 +755,26 @@ async function init() {
     navigator.serviceWorker.register('/sw.js').catch((e) => console.error('SW:', e));
   }
 
+  // Micro-interacción háptica sutil para dispositivos táctiles
+  const triggerHaptic = (ms = 12) => {
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(ms);
+      }
+    } catch { /* soporte opcional */ }
+  };
+
   // Eventos
-  $('qtyMinus').addEventListener('click', () => { state.qty = Math.max(1, state.qty - 1); $('qtyValue').textContent = String(state.qty); });
-  $('qtyPlus').addEventListener('click', () => { state.qty = Math.min(99, state.qty + 1); $('qtyValue').textContent = String(state.qty); });
+  $('qtyMinus').addEventListener('click', () => {
+    state.qty = Math.max(1, state.qty - 1);
+    $('qtyValue').textContent = String(state.qty);
+    triggerHaptic(10);
+  });
+  $('qtyPlus').addEventListener('click', () => {
+    state.qty = Math.min(99, state.qty + 1);
+    $('qtyValue').textContent = String(state.qty);
+    triggerHaptic(10);
+  });
   $('addLineBtn').addEventListener('click', () => {
     if (state.selectedSize === null) return;
     const product = state.catalog.find((p) => p.name === state.selectedCategory);
@@ -757,7 +788,18 @@ async function init() {
     else state.cart.push(line);
     S.saveCart(state.cart);
     showError('cartError', null);
+
+    // Reset de cantidad para el siguiente producto y feedback táctil/visual
+    state.qty = 1;
+    $('qtyValue').textContent = '1';
+    $('addLineBtn').classList.add('btn-pulse');
+    setTimeout(() => $('addLineBtn').classList.remove('btn-pulse'), 250);
+    triggerHaptic(16);
+
     renderCart();
+  });
+  $('discountInput').addEventListener('focus', function() {
+    this.select();
   });
   $('discountInput').addEventListener('input', () => {
     const cents = D.parseDiscountInput($('discountInput').value);
@@ -772,6 +814,17 @@ async function init() {
     $('receiptView').hidden = true;
     $('saleView').hidden = false;
     renderCart();
+  });
+  $('mobileCartBtn')?.addEventListener('click', () => {
+    $('cartSection').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('togglePasswordBtn')?.addEventListener('click', () => {
+    const input = $('adminPasswordInput');
+    const btn = $('togglePasswordBtn');
+    if (!input || !btn) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.textContent = isPassword ? '🙈' : '👁️';
   });
   $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
   $('pricesBtn').addEventListener('click', openPricesDialog);
@@ -852,7 +905,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v11';
+  const swVersion = 'v12';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);
