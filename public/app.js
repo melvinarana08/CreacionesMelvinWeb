@@ -23,6 +23,7 @@ const state = {
   pendingCount: 0,
   admin: { csrf: null, authenticated: false },
   pendingVoidId: null,
+  finishBtnVisible: false,
 };
 
 // ---------------- Utilidades de render (siempre textContent) ----------------
@@ -32,6 +33,22 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+function updateMobileCartBar() {
+  const bar = $('mobileCartBar');
+  if (!bar) return;
+  const isSaleVisible = !$('saleView').hidden;
+  // Se oculta si no hay prendas, si la venta no está activa, o si el botón "Finalizar venta" ya está visible en pantalla
+  const shouldShow = isSaleVisible && state.cart.length > 0 && !state.finishBtnVisible;
+  bar.hidden = !shouldShow;
+  if (shouldShow) {
+    const totalQty = state.cart.reduce((sum, l) => sum + l.quantity, 0);
+    const subtotal = D.computeSubtotal(state.cart);
+    const total = D.computeTotal(subtotal, state.discountCents);
+    $('mobileCartCount').textContent = `${totalQty} prenda${totalQty === 1 ? '' : 's'}`;
+    $('mobileCartTotal').textContent = D.formatUSD(total);
+  }
 }
 
 function renderCart() {
@@ -66,14 +83,7 @@ function renderCart() {
   $('finishBtn').disabled = state.cart.length === 0 || !discountValid.ok;
   showError('cartError', discountValid.ok ? null : discountValid.reason);
 
-  const bar = $('mobileCartBar');
-  if (bar) {
-    const isSaleVisible = !$('saleView').hidden;
-    bar.hidden = !isSaleVisible || state.cart.length === 0;
-    const totalQty = state.cart.reduce((sum, l) => sum + l.quantity, 0);
-    $('mobileCartCount').textContent = `${totalQty} prenda${totalQty === 1 ? '' : 's'}`;
-    $('mobileCartTotal').textContent = D.formatUSD(total);
-  }
+  updateMobileCartBar();
 }
 
 function showError(id, message) {
@@ -897,8 +907,24 @@ async function init() {
     $('saleView').hidden = false;
     renderCart();
   });
+  // Observador para ocultar la barra flotante móvil en cuanto el botón "Finalizar venta" entra en pantalla
+  if (typeof IntersectionObserver !== 'undefined') {
+    const finishBtn = $('finishBtn');
+    if (finishBtn) {
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          state.finishBtnVisible = entry.isIntersecting;
+        }
+        updateMobileCartBar();
+      }, {
+        threshold: 0.05,
+      });
+      observer.observe(finishBtn);
+    }
+  }
+
   $('mobileCartBtn')?.addEventListener('click', () => {
-    $('cartSection').scrollIntoView({ behavior: 'smooth' });
+    $('finishBtn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('togglePasswordBtn')?.addEventListener('click', () => {
     const input = $('adminPasswordInput');
@@ -987,7 +1013,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v13';
+  const swVersion = 'v14';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

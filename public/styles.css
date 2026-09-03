@@ -25,7 +25,7 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.45;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(84px + env(safe-area-inset-bottom));
 }
 
 h1, h2, h3 { margin: 0 0 .4rem; }
@@ -65,6 +65,7 @@ h3 { font-size: .95rem; }
 main, section.card { max-width: 640px; margin: 0 auto; }
 
 #saleView { padding: 1rem; display: grid; gap: 1rem; }
+#cartSection { margin-bottom: 2.5rem; }
 
 .card {
   background: var(--card);

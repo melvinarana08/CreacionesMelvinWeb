@@ -5,6 +5,9 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Prevención de solapamiento en botón "Finalizar venta"**: la barra flotante móvil (`#mobileCartBar`) ahora se oculta de forma dinámica e instantánea con `IntersectionObserver` cuando el botón *"Finalizar venta"* entra en el campo de visión del usuario, evitando cualquier interferencia táctil al momento de cobrar. Si el usuario sube a revisar productos, la barra reaparece automáticamente.
+- **Margen inferior ampliado en `#cartSection` y `body`**: mayor separación física contra el footer para garantizar que *"Finalizar venta"* tenga espacio libre completo y nunca se corte ni quede tapado.
+- **Caché PWA actualizada a `cm-sales-v14`** para actualización inmediata en todos los celulares y tablets conectados.
 - **Edición completa del catálogo en administración**:
   - **Borrado de productos**: botón *"🗑️ Borrar"* por producto con confirmación segura para eliminar prendas creadas por error.
   - **Renombrado de productos**: botón *"✏️ Renombrar"* para corregir nombres de productos directamente en la interfaz.
@@ -16,7 +19,6 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
   - Cabecera de columnas `DESCRIPCION` y `TOTAL` con separadores estructurados.
   - Resumen explícito de volumen: `Prendas vendidas: N` antes de los totales monetarios.
   - Cierre con `¡Gracias por su compra!` y `Conserve este comprobante`.
-- **Caché PWA actualizada a `cm-sales-v13`** para distribución inmediata en dispositivos móviles.
 - **Layout adaptativo para tablets y pantallas medianas (≥ 768px)**: diseño de 2 columnas estilo estación POS de mostrador, manteniendo el catálogo y selector a la izquierda y el carrito con totales anclado de forma fija (*sticky*) a la derecha.
 - **Barra flotante inferior en celulares**: resumen rápido visible cuando hay prendas en el carrito, con contador de prendas, monto total y botón de desplazamiento suave directo al cobro.
 - **Micro-interacciones y ergonomía táctil**: zonas de toque mínimas de 48×48px en selector de cantidad, vibración háptica sutil en dispositivos compatibles y animación visual de pulso al agregar prendas al carrito.

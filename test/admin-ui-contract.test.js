@@ -100,11 +100,19 @@ test('barra móvil flotante y layout responsivo de tablet están presentes', () 
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app.js están alineados en caché v13', () => {
+test('service worker y app.js están alineados en caché v14', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v13/);
-  assert.match(app, /swVersion = 'v13'/);
+  assert.match(sw, /cm-sales-v14/);
+  assert.match(app, /swVersion = 'v14'/);
+});
+
+test('barra flotante móvil previene solapamiento con botón finalizar venta', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /updateMobileCartBar/);
+  assert.match(app, /finishBtnVisible/);
+  assert.match(app, /IntersectionObserver/);
+  assert.match(css, /#cartSection\s*\{[\s\S]*margin-bottom:/);
 });
 
 test('controles para edición completa de catálogo (borrar, renombrar, gestionar tallas) existen en CSS y JS', () => {
