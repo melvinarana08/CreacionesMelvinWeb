@@ -1,7 +1,7 @@
 // db.js — apertura y esquema SQLite (node:sqlite, cero dependencias).
 import { DatabaseSync } from 'node:sqlite';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -44,6 +44,41 @@ CREATE TABLE IF NOT EXISTS sale_items (
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
 
+CREATE TABLE IF NOT EXISTS clients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name);
+CREATE INDEX IF NOT EXISTS idx_clients_last_used ON clients(last_used_at);
+
+CREATE TABLE IF NOT EXISTS encargos (
+  id TEXT PRIMARY KEY,                      -- UUID idempotente
+  folio INTEGER NOT NULL UNIQUE,            -- folio secuencial de encargo
+  client_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'cancelled')),
+  notes TEXT,
+  delivery_date TEXT,
+  total_cents INTEGER NOT NULL,
+  client_ts TEXT,
+  server_ts TEXT NOT NULL,
+  delivered_at TEXT,
+  sale_id TEXT REFERENCES sales(id)
+);
+CREATE INDEX IF NOT EXISTS idx_encargos_status ON encargos(status);
+CREATE INDEX IF NOT EXISTS idx_encargos_client ON encargos(client_name);
+
+CREATE TABLE IF NOT EXISTS encargo_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  encargo_id TEXT NOT NULL REFERENCES encargos(id) ON DELETE CASCADE,
+  product_name TEXT NOT NULL,
+  size TEXT NOT NULL,
+  unit_price_cents INTEGER NOT NULL,
+  quantity INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_encargo_items_encargo_id ON encargo_items(encargo_id);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,
@@ -74,10 +109,52 @@ export function openDb(file) {
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
   if (!row) {
     db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION));
-  } else if (Number(row.value) !== SCHEMA_VERSION) {
-    throw new Error(
-      `Esquema de base de datos no soportado: versión ${row.value} (esperada ${SCHEMA_VERSION}). Restaura un respaldo o migra manualmente.`
-    );
+  } else {
+    const v = Number(row.value);
+    if (v === 1) {
+      // Migración automática v1 -> v2
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS clients (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          created_at TEXT NOT NULL,
+          last_used_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name);
+        CREATE INDEX IF NOT EXISTS idx_clients_last_used ON clients(last_used_at);
+
+        CREATE TABLE IF NOT EXISTS encargos (
+          id TEXT PRIMARY KEY,
+          folio INTEGER NOT NULL UNIQUE,
+          client_name TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'cancelled')),
+          notes TEXT,
+          delivery_date TEXT,
+          total_cents INTEGER NOT NULL,
+          client_ts TEXT,
+          server_ts TEXT NOT NULL,
+          delivered_at TEXT,
+          sale_id TEXT REFERENCES sales(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_encargos_status ON encargos(status);
+        CREATE INDEX IF NOT EXISTS idx_encargos_client ON encargos(client_name);
+
+        CREATE TABLE IF NOT EXISTS encargo_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          encargo_id TEXT NOT NULL REFERENCES encargos(id) ON DELETE CASCADE,
+          product_name TEXT NOT NULL,
+          size TEXT NOT NULL,
+          unit_price_cents INTEGER NOT NULL,
+          quantity INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_encargo_items_encargo_id ON encargo_items(encargo_id);
+      `);
+      db.prepare("UPDATE meta SET value = '2' WHERE key = 'schema_version'").run();
+    } else if (v !== SCHEMA_VERSION) {
+      throw new Error(
+        `Esquema de base de datos no soportado: versión ${row.value} (esperada ${SCHEMA_VERSION}). Restaura un respaldo o migra manualmente.`
+      );
+    }
   }
   return db;
 }

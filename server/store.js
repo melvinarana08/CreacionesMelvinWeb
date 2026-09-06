@@ -149,6 +149,9 @@ function insertSaleTx(db, sale) {
   for (const it of sale.items) {
     insItem.run(sale.id, it.productName, it.size, it.unitPriceCents, it.quantity);
   }
+  if (sale.clientName) {
+    upsertClient(db, sale.clientName);
+  }
   return { ...sale, folio, serverTs, status: 'active', voidReason: null, voidedAt: null };
 }
 
@@ -271,4 +274,252 @@ export function listAudit(db, limit = 200) {
     .prepare('SELECT id, ts, action, actor, detail FROM audit_log ORDER BY id DESC LIMIT ?')
     .all(Math.min(Math.max(Number(limit) || 200, 1), 1000))
     .map((r) => ({ ...r, detail: r.detail ? JSON.parse(r.detail) : null }));
+}
+
+// ---------- Clientes recordados ----------
+
+export function upsertClient(db, name) {
+  if (typeof name !== 'string') return null;
+  const clean = name.trim();
+  if (!clean || clean.length > MAX_CLIENT_NAME) return null;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO clients (name, created_at, last_used_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(name) DO UPDATE SET last_used_at = excluded.last_used_at
+  `).run(clean, now, now);
+  return clean;
+}
+
+export function listClients(db, limit = 50) {
+  return db
+    .prepare('SELECT name, last_used_at FROM clients ORDER BY last_used_at DESC LIMIT ?')
+    .all(Math.min(Math.max(Number(limit) || 50, 1), 200))
+    .map((r) => r.name);
+}
+
+// ---------- Encargos (Pedidos a futuro) ----------
+
+export function validateEncargoInput(input, catalog = []) {
+  if (!input || typeof input !== 'object') {
+    throw new HttpError(400, 'invalid_payload', 'Payload de encargo inválido');
+  }
+  const id = typeof input.id === 'string' && input.id.trim() ? input.id.trim() : randomUUID();
+  if (!UUID_RE.test(id)) {
+    throw new HttpError(400, 'invalid_id', 'El id del encargo debe ser un UUID válido');
+  }
+
+  const clientName = typeof input.clientName === 'string' ? input.clientName.trim() : '';
+  if (!clientName) {
+    throw new HttpError(400, 'missing_client_name', 'El nombre del cliente es obligatorio para un encargo');
+  }
+  if (clientName.length > MAX_CLIENT_NAME) {
+    throw new HttpError(400, 'client_name_too_long', `El nombre del cliente supera ${MAX_CLIENT_NAME} caracteres`);
+  }
+
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new HttpError(400, 'empty_items', 'El encargo debe tener al menos una prenda');
+  }
+
+  const notes = typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim().slice(0, 300) : null;
+  const deliveryDate = typeof input.deliveryDate === 'string' && input.deliveryDate.trim() ? input.deliveryDate.trim().slice(0, 50) : null;
+  const clientTs = typeof input.clientTs === 'string' && !Number.isNaN(Date.parse(input.clientTs)) ? input.clientTs : null;
+
+  const items = [];
+  let totalCents = 0;
+
+  for (const it of input.items) {
+    if (!it || typeof it !== 'object') {
+      throw new HttpError(400, 'invalid_item', 'Línea de encargo inválida');
+    }
+    const productName = typeof it.productName === 'string' ? it.productName.trim() : '';
+    if (!productName) {
+      throw new HttpError(400, 'invalid_product_name', 'Producto no válido en encargo');
+    }
+    const size = normalizeSize(it.size);
+    if (size === null) {
+      throw new HttpError(400, 'invalid_size', `Talla inválida en ${productName}`);
+    }
+    const qty = Number(it.quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
+      throw new HttpError(400, 'invalid_quantity', `Cantidad inválida para ${productName} (1-${MAX_QTY})`);
+    }
+
+    let unitPriceCents = Number(it.unitPriceCents);
+    if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) {
+      const prod = findProduct(catalog, productName);
+      const sizeObj = prod ? findSize(prod, size) : null;
+      unitPriceCents = sizeObj ? sizeObj.priceCents : 0;
+    }
+
+    const itemTotal = lineTotal(unitPriceCents, qty);
+    totalCents += itemTotal;
+
+    items.push({
+      productName,
+      size,
+      quantity: qty,
+      unitPriceCents,
+    });
+  }
+
+  return {
+    id,
+    clientName,
+    notes,
+    deliveryDate,
+    clientTs,
+    items,
+    totalCents,
+  };
+}
+
+export function createEncargo(db, input, catalog = []) {
+  const encargo = validateEncargoInput(input, catalog);
+
+  const existing = getEncargo(db, encargo.id);
+  if (existing) return existing;
+
+  db.exec('BEGIN');
+  try {
+    const dup = db.prepare('SELECT id FROM encargos WHERE id = ?').get(encargo.id);
+    if (dup) {
+      db.exec('COMMIT');
+      return getEncargo(db, encargo.id);
+    }
+
+    const folio = db.prepare('SELECT COALESCE(MAX(folio), 0) + 1 AS f FROM encargos').get().f;
+    const serverTs = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO encargos (id, folio, client_name, status, notes, delivery_date, total_cents, client_ts, server_ts)
+      VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+    `).run(
+      encargo.id,
+      folio,
+      encargo.clientName,
+      encargo.notes,
+      encargo.deliveryDate,
+      encargo.totalCents,
+      encargo.clientTs,
+      serverTs
+    );
+
+    const insItem = db.prepare(`
+      INSERT INTO encargo_items (encargo_id, product_name, size, unit_price_cents, quantity)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const it of encargo.items) {
+      insItem.run(encargo.id, it.productName, String(it.size), it.unitPriceCents, it.quantity);
+    }
+
+    upsertClient(db, encargo.clientName);
+
+    db.exec('COMMIT');
+    return getEncargo(db, encargo.id);
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+export function getEncargo(db, id) {
+  const row = db.prepare('SELECT * FROM encargos WHERE id = ?').get(id);
+  if (!row) return null;
+  const items = db
+    .prepare('SELECT product_name, size, unit_price_cents, quantity FROM encargo_items WHERE encargo_id = ? ORDER BY id')
+    .all(row.id)
+    .map((i) => ({
+      productName: i.product_name,
+      size: /^\d+$/.test(i.size) ? Number(i.size) : i.size,
+      unitPriceCents: i.unit_price_cents,
+      quantity: i.quantity,
+    }));
+  return {
+    id: row.id,
+    folio: row.folio,
+    clientName: row.client_name,
+    status: row.status,
+    notes: row.notes,
+    deliveryDate: row.delivery_date,
+    totalCents: row.total_cents,
+    clientTs: row.client_ts,
+    serverTs: row.server_ts,
+    deliveredAt: row.delivered_at,
+    saleId: row.sale_id,
+    items,
+  };
+}
+
+export function listEncargos(db, options = {}) {
+  const { status = 'pending', limit = 100 } = typeof options === 'string' ? { status: options } : (options || {});
+  const params = [];
+  let sql = 'SELECT * FROM encargos';
+  if (status && status !== 'all') {
+    sql += ' WHERE status = ?';
+    params.push(status);
+  }
+  sql += ' ORDER BY folio DESC LIMIT ?';
+  params.push(Math.min(Math.max(Number(limit) || 100, 1), 500));
+
+  const rows = db.prepare(sql).all(...params);
+  if (rows.length === 0) return [];
+
+  const encargoIds = rows.map((r) => r.id);
+  const placeholders = encargoIds.map(() => '?').join(',');
+  const allItems = db
+    .prepare(`SELECT encargo_id, product_name, size, unit_price_cents, quantity FROM encargo_items WHERE encargo_id IN (${placeholders}) ORDER BY id`)
+    .all(...encargoIds);
+
+  const itemsByEncargo = new Map();
+  for (const it of allItems) {
+    if (!itemsByEncargo.has(it.encargo_id)) itemsByEncargo.set(it.encargo_id, []);
+    itemsByEncargo.get(it.encargo_id).push({
+      productName: it.product_name,
+      size: /^\d+$/.test(it.size) ? Number(it.size) : it.size,
+      unitPriceCents: it.unit_price_cents,
+      quantity: it.quantity,
+    });
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    folio: row.folio,
+    clientName: row.client_name,
+    status: row.status,
+    notes: row.notes,
+    deliveryDate: row.delivery_date,
+    totalCents: row.total_cents,
+    clientTs: row.client_ts,
+    serverTs: row.server_ts,
+    deliveredAt: row.delivered_at,
+    saleId: row.sale_id,
+    items: itemsByEncargo.get(row.id) || [],
+  }));
+}
+
+export function deliverEncargo(db, id, saleId = null) {
+  const encargo = getEncargo(db, id);
+  if (!encargo) throw new HttpError(404, 'encargo_not_found', 'Encargo no encontrado');
+  if (encargo.status === 'delivered') return encargo;
+
+  const deliveredAt = new Date().toISOString();
+  db.prepare(`
+    UPDATE encargos
+    SET status = 'delivered', delivered_at = ?, sale_id = ?
+    WHERE id = ?
+  `).run(deliveredAt, saleId, id);
+
+  return getEncargo(db, id);
+}
+
+export function cancelEncargo(db, id) {
+  const encargo = getEncargo(db, id);
+  if (!encargo) throw new HttpError(404, 'encargo_not_found', 'Encargo no encontrado');
+  if (encargo.status === 'cancelled') return encargo;
+  if (encargo.status === 'delivered') throw new HttpError(409, 'already_delivered', 'No se puede cancelar un encargo ya entregado');
+
+  db.prepare("UPDATE encargos SET status = 'cancelled' WHERE id = ?").run(id);
+  return getEncargo(db, id);
 }

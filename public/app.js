@@ -24,6 +24,11 @@ const state = {
   admin: { csrf: null, authenticated: false },
   pendingVoidId: null,
   finishBtnVisible: false,
+  encargos: [],
+  clients: S.loadClients(),
+  encargoMode: false,
+  activeEncargoId: null,
+  encargosSubtab: 'summary',
 };
 
 // ---------------- Utilidades de render (siempre textContent) ----------------
@@ -80,7 +85,24 @@ function renderCart() {
   $('discountInput').value = state.discountCents > 0 ? (state.discountCents / 100).toFixed(2) : '';
   $('subtotalVal').textContent = D.formatUSD(subtotal);
   $('totalVal').textContent = D.formatUSD(total);
+
+  // Modo Encargo vs Venta normal
+  if (state.encargoMode) {
+    $('cartTitle').textContent = state.activeEncargoId ? 'Entregando Encargo' : 'Nuevo Encargo (Pedido)';
+    $('cancelEncargoModeBtn').hidden = false;
+    $('encargoNotesRow').hidden = false;
+    $('finishBtn').hidden = !state.activeEncargoId;
+    $('saveAsEncargoBtn').hidden = Boolean(state.activeEncargoId);
+  } else {
+    $('cartTitle').textContent = 'Venta actual';
+    $('cancelEncargoModeBtn').hidden = true;
+    $('encargoNotesRow').hidden = true;
+    $('finishBtn').hidden = false;
+    $('saveAsEncargoBtn').hidden = false;
+  }
+
   $('finishBtn').disabled = state.cart.length === 0 || !discountValid.ok;
+  $('saveAsEncargoBtn').disabled = state.cart.length === 0;
   showError('cartError', discountValid.ok ? null : discountValid.reason);
 
   updateMobileCartBar();
@@ -263,9 +285,10 @@ async function syncAll() {
 // ---------------- Flujo de venta ----------------
 
 function finalizeSale() {
+  const clientVal = $('clientInput').value;
   const built = D.buildSalePayload({
     cart: state.cart,
-    clientName: $('clientInput').value,
+    clientName: clientVal,
     discountCents: state.discountCents,
     deviceId: S.getDeviceId(),
     id: S.createUuid(),
@@ -277,6 +300,24 @@ function finalizeSale() {
   // 1) Guardar local PRIMERO (offline-first). Solo si se guarda se limpia el carrito.
   S.savePendingSale(built.payload)
     .then(() => {
+      // Recordar cliente local y en servidor
+      if (built.payload.clientName) {
+        S.rememberClient(built.payload.clientName);
+        if (state.online) Api.postClient(built.payload.clientName).catch(() => {});
+        loadClientsList();
+      }
+
+      // Si correspondía a un encargo en entrega, marcarlo como entregado
+      if (state.activeEncargoId) {
+        const encargoId = state.activeEncargoId;
+        state.activeEncargoId = null;
+        exitEncargoMode();
+        const sellerToken = S.hasSellerToken() ? S.getSellerToken() : null;
+        Api.deliverEncargo(encargoId, built.payload.id, sellerToken)
+          .then(() => loadEncargos())
+          .catch((err) => console.error('Error al marcar encargo entregado:', err));
+      }
+
       state.receipt = {
         id: built.payload.id,
         lines: built.payload.lines.map((l) => ({ ...l })),
@@ -290,6 +331,7 @@ function finalizeSale() {
       state.cart = [];
       state.discountCents = 0;
       $('clientInput').value = '';
+      $('encargoNotesInput').value = '';
       S.clearCart();
       renderCart();
       showReceipt();
@@ -342,6 +384,7 @@ async function printCurrentReceipt() {
 function showReceipt() {
   $('saleView').hidden = true;
   $('adminView').hidden = true;
+  $('encargosView').hidden = true;
   $('receiptView').hidden = false;
   const bar = $('mobileCartBar');
   if (bar) bar.hidden = true;
@@ -385,6 +428,7 @@ function showAdminLogin() {
   state.admin.authenticated = false;
   $('saleView').hidden = true;
   $('receiptView').hidden = true;
+  $('encargosView').hidden = true;
   $('adminView').hidden = false;
   $('adminLogin').hidden = false;
   $('adminPanel').hidden = true;
@@ -396,8 +440,27 @@ function showAdminLogin() {
 function showSaleView() {
   $('adminView').hidden = true;
   $('receiptView').hidden = true;
+  $('encargosView').hidden = true;
   $('saleView').hidden = false;
+  $('navSalesBtn').classList.add('active');
+  $('navEncargosBtn').classList.remove('active');
+  $('navSalesBtn').setAttribute('aria-pressed', 'true');
+  $('navEncargosBtn').setAttribute('aria-pressed', 'false');
   renderCart();
+}
+
+function showEncargosView() {
+  $('adminView').hidden = true;
+  $('receiptView').hidden = true;
+  $('saleView').hidden = true;
+  $('encargosView').hidden = false;
+  $('navEncargosBtn').classList.add('active');
+  $('navSalesBtn').classList.remove('active');
+  $('navEncargosBtn').setAttribute('aria-pressed', 'true');
+  $('navSalesBtn').setAttribute('aria-pressed', 'false');
+  const bar = $('mobileCartBar');
+  if (bar) bar.hidden = true;
+  loadEncargos();
 }
 
 function requireAdminLogin(message = 'Tu sesión de administración terminó. Inicia sesión nuevamente.') {
@@ -820,6 +883,387 @@ async function loadAudit() {
   }
 }
 
+// ---------------- Gestión de Encargos y Clientes ----------------
+
+function enterEncargoMode(activeEncargo = null) {
+  state.encargoMode = true;
+  if (activeEncargo) {
+    state.activeEncargoId = activeEncargo.id;
+    $('clientInput').value = activeEncargo.clientName || '';
+    $('encargoNotesInput').value = activeEncargo.notes || '';
+  } else {
+    state.activeEncargoId = null;
+  }
+  showSaleView();
+  renderCart();
+  if (!$('clientInput').value) {
+    $('clientInput').focus();
+  }
+}
+
+function exitEncargoMode() {
+  state.encargoMode = false;
+  state.activeEncargoId = null;
+  $('encargoNotesInput').value = '';
+  renderCart();
+}
+
+async function saveCurrentCartAsEncargo() {
+  if (state.cart.length === 0) {
+    showError('cartError', 'Agrega al menos una prenda para el encargo.');
+    return;
+  }
+  const clientName = $('clientInput').value.trim();
+  if (!clientName) {
+    showError('cartError', 'Por favor ingresa o selecciona el nombre del cliente para el encargo.');
+    $('clientInput').focus();
+    return;
+  }
+  showError('cartError', null);
+
+  const notes = $('encargoNotesInput').value.trim() || null;
+  const payload = {
+    id: S.createUuid(),
+    clientName,
+    notes,
+    items: state.cart.map((line) => ({
+      productName: line.product,
+      size: line.size,
+      unitPriceCents: line.unitPriceCents,
+      quantity: line.quantity,
+    })),
+    totalCents: D.computeSubtotal(state.cart),
+  };
+
+  let token = S.hasSellerToken() ? S.getSellerToken() : null;
+  let res = await Api.postEncargo(payload, token);
+  if (!res.ok && res.error && res.error.code === 'seller_token_required') {
+    token = askSellerToken();
+    if (!token) return;
+    res = await Api.postEncargo(payload, token);
+  }
+
+  if (!res.ok) {
+    showError('cartError', res.error?.message || 'No se pudo guardar el encargo en el servidor.');
+    return;
+  }
+
+  // Guardado exitoso: registrar cliente
+  S.rememberClient(clientName);
+  if (state.online) Api.postClient(clientName).catch(() => {});
+  loadClientsList();
+
+  // Limpiar carrito y estado
+  state.cart = [];
+  state.discountCents = 0;
+  S.clearCart();
+  $('clientInput').value = '';
+  $('encargoNotesInput').value = '';
+  exitEncargoMode();
+  renderCart();
+
+  const folioText = res.data?.encargo?.folio ? `Folio E-${res.data.encargo.folio}` : 'guardado';
+  alert(`📦 Encargo guardado con éxito (${folioText}) para ${clientName}.`);
+  showEncargosView();
+  switchEncargosSubtab('clients');
+}
+
+function switchEncargosSubtab(tabName) {
+  state.encargosSubtab = tabName;
+  $('tabSummaryBtn').classList.toggle('active', tabName === 'summary');
+  $('tabClientsBtn').classList.toggle('active', tabName === 'clients');
+  $('tabDeliveredBtn').classList.toggle('active', tabName === 'delivered');
+
+  $('tabSummaryBtn').setAttribute('aria-selected', String(tabName === 'summary'));
+  $('tabClientsBtn').setAttribute('aria-selected', String(tabName === 'clients'));
+  $('tabDeliveredBtn').setAttribute('aria-selected', String(tabName === 'delivered'));
+
+  $('encargosSummarySection').hidden = tabName !== 'summary';
+  $('encargosClientsSection').hidden = tabName !== 'clients';
+  $('encargosDeliveredSection').hidden = tabName !== 'delivered';
+}
+
+async function loadEncargos() {
+  const token = S.hasSellerToken() ? S.getSellerToken() : null;
+  const [pendingRes, deliveredRes] = await Promise.all([
+    Api.fetchEncargos(token, 'pending'),
+    Api.fetchEncargos(token, 'delivered'),
+  ]);
+
+  if (pendingRes.ok && Array.isArray(pendingRes.data?.encargos)) {
+    state.encargos = pendingRes.data.encargos;
+  } else {
+    state.encargos = [];
+  }
+
+  const delivered = (deliveredRes.ok && Array.isArray(deliveredRes.data?.encargos)) ? deliveredRes.data.encargos : [];
+
+  const count = state.encargos.length;
+  $('encargosBadge').textContent = String(count);
+  $('encargosBadge').hidden = count === 0;
+  $('encargosCountText').textContent = String(count);
+
+  renderEncargosSummary(state.encargos);
+  renderEncargosClients(state.encargos);
+  renderEncargosDelivered(delivered);
+}
+
+function renderEncargosSummary(encargos) {
+  const container = $('encargosSummaryContent');
+  container.replaceChildren();
+
+  const summary = D.aggregateEncargosByProductAndSize(encargos);
+  if (summary.products.length === 0) {
+    container.append(el('p', 'muted', 'No hay encargos pendientes en este momento. Los pedidos que tomes en tus rutas aparecerán aquí consolidados por prenda y talla para el taller.'));
+    return;
+  }
+
+  const headerBox = el('div', 'workshop-summary-header');
+  headerBox.append(
+    el('div', 'workshop-summary-title', `Total a confeccionar / alistar: ${summary.grandTotalQty} prenda${summary.grandTotalQty === 1 ? '' : 's'}`),
+    el('div', 'workshop-summary-sub', `Consolidado de ${encargos.length} pedido${encargos.length === 1 ? '' : 's'} activo${encargos.length === 1 ? '' : 's'}`)
+  );
+  container.append(headerBox);
+
+  for (const prod of summary.products) {
+    const card = el('div', 'encargo-card workshop-card');
+    const head = el('div', 'admin-item-head');
+    head.append(
+      el('strong', null, `🧵 ${prod.name}`),
+      el('span', 'badge badge-primary', `${prod.subtotalQty} prenda${prod.subtotalQty === 1 ? '' : 's'}`)
+    );
+    card.append(head);
+
+    const grid = el('div', 'workshop-size-grid');
+    for (const s of prod.sizes) {
+      const chip = el('div', 'workshop-size-chip');
+      const sLabel = typeof s.size === 'string' ? `Talla ${s.size}` : `Talla ${s.size}`;
+      chip.append(el('span', 'size-label', sLabel), el('span', 'size-qty', `x${s.quantity}`));
+      grid.append(chip);
+    }
+    card.append(grid);
+    container.append(card);
+  }
+}
+
+function renderEncargosClients(encargos) {
+  const container = $('encargosClientsList');
+  container.replaceChildren();
+
+  if (encargos.length === 0) {
+    container.append(el('p', 'muted', 'No hay pedidos pendientes por cliente.'));
+    return;
+  }
+
+  for (const enc of encargos) {
+    const card = el('div', 'encargo-card');
+    const head = el('div', 'admin-item-head');
+    head.append(
+      el('strong', null, `👤 ${enc.clientName}`),
+      el('span', 'badge', `Folio E-${enc.folio}`)
+    );
+    card.append(head);
+
+    const meta = el('div', 'encargo-meta');
+    const dateStr = enc.serverTs ? new Date(enc.serverTs).toLocaleDateString('es') : '';
+    meta.append(el('span', 'muted', dateStr));
+    if (enc.notes) meta.append(el('span', 'encargo-note', ` · Nota: ${enc.notes}`));
+    card.append(meta);
+
+    const itemsList = el('ul', 'encargo-items-list');
+    for (const it of enc.items || []) {
+      const li = el('li', 'encargo-item-row');
+      const sLabel = typeof it.size === 'string' ? `Talla ${it.size}` : `Talla ${it.size}`;
+      li.append(
+        el('span', null, `${it.productName} · ${sLabel} (${it.quantity} pza${it.quantity === 1 ? '' : 's'})`),
+        el('span', 'muted', D.formatUSD(D.computeLineTotal(it.unitPriceCents, it.quantity)))
+      );
+      itemsList.append(li);
+    }
+    card.append(itemsList);
+
+    const totalRow = el('div', 'encargo-total-row');
+    totalRow.append(el('span', null, 'Total estimado:'), el('strong', null, D.formatUSD(enc.totalCents)));
+    card.append(totalRow);
+
+    const actions = el('div', 'encargo-actions');
+    const convertBtn = el('button', 'btn btn-primary btn-small', '🛒 Convertir a Venta');
+    convertBtn.addEventListener('click', () => convertEncargoToSale(enc));
+
+    const printBtn = el('button', 'btn btn-small', '🖨️ Ticket');
+    printBtn.addEventListener('click', () => printSingleEncargoTicket(enc));
+
+    const cancelBtn = el('button', 'btn btn-small btn-danger-soft', '✕ Cancelar');
+    cancelBtn.addEventListener('click', () => cancelEncargoAction(enc));
+
+    actions.append(convertBtn, printBtn, cancelBtn);
+    card.append(actions);
+    container.append(card);
+  }
+}
+
+function convertEncargoToSale(encargo) {
+  if (state.cart.length > 0) {
+    if (!window.confirm('Tu carrito actual tiene prendas. ¿Deseas reemplazarlas con las prendas de este encargo?')) {
+      return;
+    }
+  }
+
+  state.cart = (encargo.items || []).map((it) => ({
+    product: it.productName,
+    size: it.size,
+    quantity: it.quantity,
+    unitPriceCents: it.unitPriceCents,
+  }));
+  S.saveCart(state.cart);
+  state.discountCents = 0;
+  state.activeEncargoId = encargo.id;
+  state.encargoMode = true;
+
+  $('clientInput').value = encargo.clientName || '';
+  $('encargoNotesInput').value = encargo.notes || '';
+
+  showSaleView();
+  renderCart();
+}
+
+async function printSingleEncargoTicket(encargo) {
+  const res = await Printer.printSingleEncargo(encargo);
+  if (res.ok) {
+    alert('✅ Ticket de encargo impreso correctamente.');
+  } else {
+    alert(`No se pudo imprimir: ${res.reason}`);
+  }
+}
+
+async function cancelEncargoAction(encargo) {
+  if (!window.confirm(`¿Deseas cancelar el encargo E-${encargo.folio} de ${encargo.clientName}?`)) {
+    return;
+  }
+  const token = S.hasSellerToken() ? S.getSellerToken() : null;
+  const res = await Api.cancelEncargo(encargo.id, token);
+  if (res.ok) {
+    await loadEncargos();
+  } else {
+    alert(`No se pudo cancelar: ${res.error?.message || 'Error del servidor'}`);
+  }
+}
+
+function renderEncargosDelivered(deliveredEncargos) {
+  const container = $('encargosDeliveredList');
+  container.replaceChildren();
+
+  if (!deliveredEncargos || deliveredEncargos.length === 0) {
+    container.append(el('p', 'muted', 'No hay historial de encargos entregados recientemente.'));
+    return;
+  }
+
+  for (const enc of deliveredEncargos) {
+    const card = el('div', 'encargo-card delivered-card');
+    const head = el('div', 'admin-item-head');
+    head.append(
+      el('strong', null, `👤 ${enc.clientName}`),
+      el('span', 'badge badge-success', 'Entregado')
+    );
+    card.append(head);
+
+    const meta = el('div', 'encargo-meta');
+    const delDate = enc.deliveredAt ? new Date(enc.deliveredAt).toLocaleString('es') : '';
+    meta.append(el('span', 'muted', `Entregado: ${delDate} · Folio E-${enc.folio}`));
+    card.append(meta);
+
+    const totalRow = el('div', 'encargo-total-row');
+    const countItems = (enc.items || []).reduce((sum, it) => sum + (it.quantity || 1), 0);
+    totalRow.append(
+      el('span', null, `${countItems} prenda${countItems === 1 ? '' : 's'}`),
+      el('strong', null, D.formatUSD(enc.totalCents))
+    );
+    card.append(totalRow);
+    container.append(card);
+  }
+}
+
+async function printEncargosSummaryTicketAction() {
+  if (!state.encargos || state.encargos.length === 0) {
+    alert('No hay encargos activos para imprimir.');
+    return;
+  }
+  const summary = D.aggregateEncargosByProductAndSize(state.encargos);
+  const res = await Printer.printEncargosTicket({
+    encargos: state.encargos,
+    summary,
+    date: new Date().toLocaleDateString('es'),
+  });
+  if (res.ok) {
+    alert('✅ Ticket de taller impreso correctamente.');
+  } else {
+    alert(`No se pudo imprimir: ${res.reason}`);
+  }
+}
+
+// ---------------- Directorio y selector de clientes ----------------
+
+async function loadClientsList() {
+  state.clients = S.loadClients();
+  renderClientsDatalist();
+  try {
+    const res = await Api.fetchClients();
+    if (res.ok && Array.isArray(res.data?.clients)) {
+      for (const c of res.data.clients) {
+        if (c && c.name) S.rememberClient(c.name);
+      }
+      state.clients = S.loadClients();
+      renderClientsDatalist();
+    }
+  } catch {
+    /* offline */
+  }
+}
+
+function renderClientsDatalist() {
+  const datalist = $('clientsDatalist');
+  if (!datalist) return;
+  datalist.replaceChildren();
+  for (const name of state.clients) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    datalist.append(opt);
+  }
+}
+
+function openClientPicker() {
+  const searchInput = $('clientPickerSearch');
+  searchInput.value = $('clientInput').value || '';
+  renderClientChips(searchInput.value);
+  $('clientPickerDialog').showModal();
+  searchInput.focus();
+}
+
+function renderClientChips(filterText = '') {
+  const container = $('clientChipsList');
+  container.replaceChildren();
+
+  const query = (filterText || '').trim().toLocaleLowerCase('es');
+  const matched = state.clients.filter((c) => !query || c.toLocaleLowerCase('es').includes(query));
+
+  if (matched.length === 0) {
+    container.append(el('p', 'muted', 'No hay clientes guardados que coincidan. Escribe el nombre arriba para usarlo.'));
+    return;
+  }
+
+  for (const name of matched) {
+    const chip = el('button', 'client-chip', name);
+    chip.type = 'button';
+    chip.addEventListener('click', () => {
+      $('clientInput').value = name;
+      S.rememberClient(name);
+      loadClientsList();
+      $('clientPickerDialog').close();
+    });
+    container.append(chip);
+  }
+}
+
 // ---------------- Carga inicial ----------------
 
 async function loadCatalog() {
@@ -998,11 +1442,42 @@ async function init() {
     if (!document.hidden) syncAll();
   });
 
+  // Navegación principal Encargos / Ventas
+  $('navSalesBtn').addEventListener('click', showSaleView);
+  $('navEncargosBtn').addEventListener('click', showEncargosView);
+  $('newEncargoBtn').addEventListener('click', () => enterEncargoMode());
+  $('saveAsEncargoBtn').addEventListener('click', saveCurrentCartAsEncargo);
+  $('cancelEncargoModeBtn').addEventListener('click', exitEncargoMode);
+  $('printEncargosSummaryBtn').addEventListener('click', printEncargosSummaryTicketAction);
+
+  // Subtabs de Encargos
+  $('tabSummaryBtn').addEventListener('click', () => switchEncargosSubtab('summary'));
+  $('tabClientsBtn').addEventListener('click', () => switchEncargosSubtab('clients'));
+  $('tabDeliveredBtn').addEventListener('click', () => switchEncargosSubtab('delivered'));
+
+  // Directorio y selector de clientes
+  $('pickClientBtn').addEventListener('click', openClientPicker);
+  $('closeClientPickerBtn').addEventListener('click', () => $('clientPickerDialog').close());
+  $('useClientPickerBtn').addEventListener('click', () => {
+    const val = $('clientPickerSearch').value.trim();
+    if (val) {
+      $('clientInput').value = val;
+      S.rememberClient(val);
+      loadClientsList();
+    }
+    $('clientPickerDialog').close();
+  });
+  $('clientPickerSearch').addEventListener('input', () => {
+    renderClientChips($('clientPickerSearch').value);
+  });
+
   renderCart();
   renderStatus();
   renderAppVersion();
   await refreshPendingCount();
   await loadCatalog();
+  await loadClientsList();
+  await loadEncargos();
   syncAll();
 }
 
@@ -1013,7 +1488,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v14';
+  const swVersion = 'v15';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

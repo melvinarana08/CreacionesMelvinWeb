@@ -10,6 +10,8 @@ import {
   formatTwoCols,
   formatItemLine,
   buildTicketBytes,
+  buildEncargosTicketBytes,
+  buildSingleEncargoTicketBytes,
   isWebBluetoothAvailable,
 } from '../public/printer.js';
 
@@ -180,3 +182,83 @@ test('buildTicketBytes: incluye encabezado mejorado, columnas y prendas vendidas
   assert.match(text, /TOTAL:.*\$16\.00/);
   assert.match(text, /¡Gracias por su compra!/);
 });
+
+test('buildEncargosTicketBytes: genera ticket de taller con casillas [ ] y desglose consolidado', () => {
+  const summary = {
+    grandTotalQty: 5,
+    products: [
+      {
+        name: 'Pantalón',
+        subtotalQty: 3,
+        sizes: [
+          { size: 32, quantity: 2 },
+          { size: 34, quantity: 1 },
+        ],
+      },
+      {
+        name: 'Camisa',
+        subtotalQty: 2,
+        sizes: [
+          { size: 10, quantity: 2 },
+        ],
+      },
+    ],
+  };
+
+  const encargos = [
+    {
+      folio: 101,
+      clientName: 'Doña Elena',
+      notes: 'Para el viernes',
+      totalCents: 2400,
+      items: [
+        { productName: 'Pantalón', size: 32, quantity: 2 },
+        { productName: 'Camisa', size: 10, quantity: 1 },
+      ],
+    },
+  ];
+
+  const bytes = buildEncargosTicketBytes({ encargos, summary, date: '05/09/2026' });
+  const text = new TextDecoder().decode(bytes);
+
+  assert.match(text, /Creaciones Melvin/);
+  assert.match(text, /PEDIDOS DE TALLER \/ ALISTADO/);
+  assert.match(text, /RESUMEN DE CONFECCION/);
+  assert.match(text, /\[ \] Pantalón/);
+  assert.match(text, /Talla 32.*x 2/);
+  assert.match(text, /TOTAL PRENDAS A ALISTAR:.*5/);
+  assert.match(text, /DETALLE POR CLIENTE/);
+  assert.match(text, /\[ \] Doña Elena \(E-101\)/);
+  assert.match(text, /Nota: Para el viernes/);
+
+  // Termina con corte GS V 0
+  const len = bytes.length;
+  assert.equal(bytes[len - 3], 0x1d);
+  assert.equal(bytes[len - 2], 0x56);
+  assert.equal(bytes[len - 1], 0x00);
+});
+
+test('buildSingleEncargoTicketBytes: genera ticket individual con casilla [ ] para empaque o cliente', () => {
+  const encargo = {
+    folio: 88,
+    clientName: 'Don Mario',
+    notes: 'Azul marino',
+    totalCents: 1500,
+    items: [
+      { productName: 'Pantalón', size: 30, quantity: 1, unitPriceCents: 800 },
+      { productName: 'Camisa', size: 'M', quantity: 1, unitPriceCents: 700 },
+    ],
+  };
+
+  const bytes = buildSingleEncargoTicketBytes(encargo);
+  const text = new TextDecoder().decode(bytes);
+
+  assert.match(text, /COMPROBANTE DE ENCARGO/);
+  assert.match(text, /Folio encargo: E-88/);
+  assert.match(text, /Cliente: Don Mario/);
+  assert.match(text, /Nota: Azul marino/);
+  assert.match(text, /Pantalón \(T30\) x1/);
+  assert.match(text, /TOTAL ESTIMADO:.*\$15\.00/);
+  assert.match(text, /¡Gracias por su encargo!/);
+});
+

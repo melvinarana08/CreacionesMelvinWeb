@@ -204,6 +204,210 @@ export function buildTicketBytes(receipt) {
   return new Uint8Array(bytes);
 }
 
+/**
+ * Construye los bytes ESC/POS para el ticket de Taller y Alistado de Encargos.
+ * Incluye el resumen consolidado por Producto/Talla y la lista por cliente con casillas [ ].
+ * @param {{encargos:Array, summary:Object, date?:string}} params
+ * @returns {Uint8Array}
+ */
+export function buildEncargosTicketBytes({ encargos = [], summary, date = '' }) {
+  const bytes = [];
+  const push = (arr) => { for (const b of arr) bytes.push(b); };
+
+  push(INIT);
+  push(ALIGN_CENTER);
+
+  // Encabezado de tienda
+  push(BOLD_ON);
+  push(SIZE_DOUBLE_W);
+  push(encodeText('Creaciones Melvin'));
+  push([LF]);
+  push(SIZE_NORMAL);
+  push(BOLD_OFF);
+
+  push(encodeText('PEDIDOS DE TALLER / ALISTADO'));
+  push([LF]);
+  if (date) {
+    push(encodeText(`Fecha: ${date}`));
+    push([LF]);
+  }
+  push(encodeText(`Total encargos activos: ${encargos.length}`));
+  push([LF]);
+
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+  push(encodeText(centerLine('RESUMEN DE CONFECCION', COLS)));
+  push([LF]);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+  push(ALIGN_LEFT);
+
+  if (summary && Array.isArray(summary.products) && summary.products.length > 0) {
+    for (const prod of summary.products) {
+      push(BOLD_ON);
+      push(encodeText(`[ ] ${prod.name}`));
+      push([LF]);
+      push(BOLD_OFF);
+      for (const s of prod.sizes) {
+        const sizeLabel = typeof s.size === 'string' ? `T ${s.size}` : `Talla ${s.size}`;
+        push(encodeText(formatTwoCols(`    ${sizeLabel}`, `x ${s.quantity}`)));
+        push([LF]);
+      }
+      push(encodeText(`    Subtotal: ${prod.subtotalQty} prendas`));
+      push([LF]);
+      push(encodeText('-'.repeat(COLS)));
+      push([LF]);
+    }
+
+    push(BOLD_ON);
+    push(encodeText(formatTwoCols('TOTAL PRENDAS A ALISTAR:', String(summary.grandTotalQty))));
+    push([LF]);
+    push(BOLD_OFF);
+  } else {
+    push(encodeText('No hay prendas pendientes.'));
+    push([LF]);
+  }
+
+  // Sección 2: Desglose por cliente
+  push([LF]);
+  push(ALIGN_CENTER);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+  push(encodeText(centerLine('DETALLE POR CLIENTE', COLS)));
+  push([LF]);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+  push(ALIGN_LEFT);
+
+  for (const enc of encargos) {
+    push(BOLD_ON);
+    push(encodeText(`[ ] ${enc.clientName} (E-${enc.folio})`));
+    push([LF]);
+    push(BOLD_OFF);
+
+    if (enc.deliveryDate) {
+      push(encodeText(`    Entrega: ${enc.deliveryDate}`));
+      push([LF]);
+    }
+    if (enc.notes) {
+      push(encodeText(`    Nota: ${enc.notes}`));
+      push([LF]);
+    }
+
+    if (Array.isArray(enc.items)) {
+      for (const it of enc.items) {
+        const sizeLabel = typeof it.size === 'string' ? `T ${it.size}` : `T${it.size}`;
+        push(encodeText(formatTwoCols(`    ${it.productName} (${sizeLabel})`, `x${it.quantity}`)));
+        push([LF]);
+      }
+    }
+    push(encodeText(formatTwoCols('    Total est.:', `$${centsToText(enc.totalCents)}`)));
+    push([LF]);
+    push(encodeText('-'.repeat(COLS)));
+    push([LF]);
+  }
+
+  push([LF]);
+  push(ALIGN_CENTER);
+  push(encodeText('Control de Confección Melvin'));
+  push([LF]);
+  push(encodeText('Conserve esta hoja de ruta'));
+  push([LF]);
+  push([LF]);
+  push([LF]);
+  push(CUT);
+
+  return new Uint8Array(bytes);
+}
+
+/**
+ * Construye los bytes ESC/POS de un encargo individual para el cliente o empaque.
+ * @param {Object} encargo
+ * @returns {Uint8Array}
+ */
+export function buildSingleEncargoTicketBytes(encargo) {
+  const bytes = [];
+  const push = (arr) => { for (const b of arr) bytes.push(b); };
+
+  push(INIT);
+  push(ALIGN_CENTER);
+
+  push(BOLD_ON);
+  push(SIZE_DOUBLE_W);
+  push(encodeText('Creaciones Melvin'));
+  push([LF]);
+  push(SIZE_NORMAL);
+  push(BOLD_OFF);
+
+  push(encodeText('COMPROBANTE DE ENCARGO'));
+  push([LF]);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+  push(ALIGN_LEFT);
+
+  push(encodeText(`Folio encargo: E-${encargo.folio}`));
+  push([LF]);
+  push(encodeText(`Cliente: ${encargo.clientName}`));
+  push([LF]);
+  if (encargo.deliveryDate) {
+    push(encodeText(`Fecha de entrega: ${encargo.deliveryDate}`));
+    push([LF]);
+  }
+  if (encargo.notes) {
+    push(encodeText(`Nota: ${encargo.notes}`));
+    push([LF]);
+  }
+
+  push(encodeText('-'.repeat(COLS)));
+  push([LF]);
+  push(encodeText(formatTwoCols('DESCRIPCION', 'TOTAL')));
+  push([LF]);
+  push(encodeText('-'.repeat(COLS)));
+  push([LF]);
+
+  let totalQty = 0;
+  if (Array.isArray(encargo.items)) {
+    for (const it of encargo.items) {
+      totalQty += it.quantity || 0;
+      const sizeLabel = typeof it.size === 'string' ? 'T ' : 'T';
+      const desc = `${it.productName} (${sizeLabel}${it.size}) x${it.quantity}`;
+      const lineTotalCents = (it.unitPriceCents || 0) * (it.quantity || 0);
+      const unit = `$${centsToText(it.unitPriceCents || 0)} c/u`;
+      const tot = `$${centsToText(lineTotalCents)}`;
+      const space = Math.max(1, COLS - unit.length - tot.length);
+      push(encodeText(`${desc}\n${unit}${' '.repeat(space)}${tot}`));
+      push([LF]);
+    }
+  }
+
+  push(encodeText('-'.repeat(COLS)));
+  push([LF]);
+  push(encodeText(formatTwoCols('Prendas encargadas:', String(totalQty))));
+  push([LF]);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+
+  push(BOLD_ON);
+  push(SIZE_DOUBLE_H);
+  push(encodeText(formatTwoCols('TOTAL ESTIMADO:', `$${centsToText(encargo.totalCents || 0)}`)));
+  push([LF]);
+  push(SIZE_NORMAL);
+  push(BOLD_OFF);
+  push(encodeText('='.repeat(COLS)));
+  push([LF]);
+
+  push(ALIGN_CENTER);
+  push(encodeText('¡Gracias por su encargo!'));
+  push([LF]);
+  push(encodeText('Creaciones Melvin a su servicio'));
+  push([LF]);
+  push([LF]);
+  push([LF]);
+  push(CUT);
+
+  return new Uint8Array(bytes);
+}
+
 // ---- Conexión Bluetooth (runtime, no testeable en Node) ----
 
 /**
@@ -354,5 +558,29 @@ export async function printReceipt(receipt) {
     if (!conn.ok) return conn;
   }
   const data = buildTicketBytes(receipt);
+  return sendToPrinter(data);
+}
+
+/**
+ * Imprime el ticket de taller y alistado de encargos por Bluetooth.
+ */
+export async function printEncargosTicket(params) {
+  if (!printerState.connected) {
+    const conn = await connectPrinter();
+    if (!conn.ok) return conn;
+  }
+  const data = buildEncargosTicketBytes(params);
+  return sendToPrinter(data);
+}
+
+/**
+ * Imprime un ticket de encargo individual por Bluetooth.
+ */
+export async function printSingleEncargo(encargo) {
+  if (!printerState.connected) {
+    const conn = await connectPrinter();
+    if (!conn.ok) return conn;
+  }
+  const data = buildSingleEncargoTicketBytes(encargo);
   return sendToPrinter(data);
 }

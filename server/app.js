@@ -13,7 +13,23 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { HttpError } from './errors.js';
 import { createSessionStore, verifyPassword } from './auth.js';
-import { getCatalog, replaceCatalog, createSale, voidSale, getSale, listSales, logAudit, listAudit } from './store.js';
+import {
+  getCatalog,
+  replaceCatalog,
+  createSale,
+  voidSale,
+  getSale,
+  listSales,
+  logAudit,
+  listAudit,
+  listClients,
+  upsertClient,
+  createEncargo,
+  getEncargo,
+  listEncargos,
+  deliverEncargo,
+  cancelEncargo,
+} from './store.js';
 import { loadSeed, toPublicCatalog } from './catalog.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -225,6 +241,68 @@ export function createApp(opts) {
       const sale = getSale(db, id);
       if (!sale) throw new HttpError(404, 'sale_not_found', 'Venta no encontrada');
       return sendJson(res, 200, { sale });
+    }
+
+    // ---- Clientes recordados ----
+    if (method === 'GET' && pathname === '/api/clients') {
+      const limit = Number(url.searchParams.get('limit')) || 50;
+      return sendJson(res, 200, { clients: listClients(db, limit) });
+    }
+
+    if (method === 'POST' && pathname === '/api/clients') {
+      const body = await readJsonBody(req);
+      const name = upsertClient(db, body?.name);
+      if (!name) throw new HttpError(400, 'invalid_client_name', 'Nombre de cliente inválido');
+      return sendJson(res, 201, { name });
+    }
+
+    // ---- Encargos (Pedidos a futuro) ----
+    if (method === 'GET' && pathname === '/api/encargos') {
+      if (!sellerOk) {
+        throw new HttpError(401, 'seller_token_required', 'Se requiere X-Seller-Token');
+      }
+      const status = url.searchParams.get('status') || 'pending';
+      const limit = Number(url.searchParams.get('limit')) || 100;
+      return sendJson(res, 200, { encargos: listEncargos(db, { status, limit }) });
+    }
+
+    if (method === 'POST' && pathname === '/api/encargos') {
+      if (!sellerOk) {
+        throw new HttpError(401, 'seller_token_required', 'Se requiere X-Seller-Token');
+      }
+      const body = await readJsonBody(req);
+      const existing = body && typeof body.id === 'string' ? getEncargo(db, body.id) : null;
+      const encargo = createEncargo(db, body ?? {}, getCatalog(db));
+      return sendJson(res, existing ? 200 : 201, { encargo });
+    }
+
+    if (method === 'POST' && /^\/api\/encargos\/[^/]+\/deliver$/.test(pathname)) {
+      if (!sellerOk) {
+        throw new HttpError(401, 'seller_token_required', 'Se requiere X-Seller-Token');
+      }
+      const id = decodeURIComponent(pathname.split('/')[3]);
+      const body = await readJsonBody(req);
+      const encargo = deliverEncargo(db, id, body?.saleId);
+      return sendJson(res, 200, { encargo });
+    }
+
+    if (method === 'POST' && /^\/api\/encargos\/[^/]+\/cancel$/.test(pathname)) {
+      if (!sellerOk) {
+        throw new HttpError(401, 'seller_token_required', 'Se requiere X-Seller-Token');
+      }
+      const id = decodeURIComponent(pathname.split('/')[3]);
+      const encargo = cancelEncargo(db, id);
+      return sendJson(res, 200, { encargo });
+    }
+
+    if (method === 'GET' && /^\/api\/encargos\/[^/]+$/.test(pathname)) {
+      if (!sellerOk) {
+        throw new HttpError(401, 'seller_token_required', 'Se requiere X-Seller-Token');
+      }
+      const id = decodeURIComponent(pathname.split('/').pop());
+      const encargo = getEncargo(db, id);
+      if (!encargo) throw new HttpError(404, 'encargo_not_found', 'Encargo no encontrado');
+      return sendJson(res, 200, { encargo });
     }
 
     // ---- Admin ----

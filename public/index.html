@@ -12,7 +12,13 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>Creaciones Melvin</h1>
+    <div class="header-main">
+      <h1>Creaciones Melvin</h1>
+      <nav class="header-nav" aria-label="Navegación principal">
+        <button type="button" id="navSalesBtn" class="btn btn-small nav-btn active" aria-pressed="true">🛒 Ventas</button>
+        <button type="button" id="navEncargosBtn" class="btn btn-small nav-btn" aria-pressed="false">📦 Encargos <span id="encargosBadge" class="badge" hidden>0</span></button>
+      </nav>
+    </div>
     <div class="status-bar" id="statusBar">
       <span class="dot" id="connDot" aria-hidden="true"></span>
       <span id="connText" role="status">Conectando…</span>
@@ -42,7 +48,10 @@
     </section>
 
     <section id="cartSection" class="card" aria-label="Carrito">
-      <h2>Venta actual</h2>
+      <div class="section-title">
+        <h2 id="cartTitle">Venta actual</h2>
+        <button type="button" id="cancelEncargoModeBtn" class="btn btn-small btn-danger-soft" hidden>Cancelar encargo</button>
+      </div>
       <p id="cartEmpty" class="muted">El carrito está vacío.</p>
       <ul id="cartList" class="cart-list"></ul>
       <div class="cart-meta">
@@ -52,12 +61,23 @@
           <input id="discountInput" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
         </div>
         <div class="meta-row total"><span>Total</span><span id="totalVal">$0.00</span></div>
-        <div class="meta-row">
-          <label for="clientInput">Cliente (nombre o teléfono, opcional)</label>
-          <input id="clientInput" type="text" maxlength="100" placeholder="Opcional" autocomplete="off">
+        <div class="meta-row client-row">
+          <div class="client-label-group">
+            <label for="clientInput">Cliente</label>
+            <button type="button" id="pickClientBtn" class="btn btn-small btn-pick-client" title="Buscar en lista de clientes">👥 Clientes</button>
+          </div>
+          <input id="clientInput" list="clientsDatalist" type="text" maxlength="100" placeholder="Escribe o selecciona cliente" autocomplete="off">
+          <datalist id="clientsDatalist"></datalist>
+        </div>
+        <div id="encargoNotesRow" class="meta-row" hidden>
+          <label for="encargoNotesInput">Nota o fecha para el encargo (opcional)</label>
+          <input id="encargoNotesInput" type="text" maxlength="150" placeholder="Ej. Para el viernes / Color azul" autocomplete="off">
         </div>
         <p id="cartError" class="error-text" role="alert" hidden></p>
-        <button type="button" id="finishBtn" class="btn btn-primary btn-big">Finalizar venta</button>
+        <div class="cart-buttons-group">
+          <button type="button" id="finishBtn" class="btn btn-primary btn-big">Finalizar venta</button>
+          <button type="button" id="saveAsEncargoBtn" class="btn btn-encargo btn-big">📦 Guardar como Encargo</button>
+        </div>
       </div>
     </section>
 
@@ -69,6 +89,41 @@
       </div>
       <button type="button" id="mobileCartBtn" class="btn">Ver venta ↓</button>
     </div>
+  </main>
+
+  <!-- ============ ENCARGOS Y TALLER ============ -->
+  <main id="encargosView" class="card encargos-view" aria-label="Gestión de Encargos" hidden>
+    <div class="encargos-header">
+      <div class="encargos-title-box">
+        <h2>📦 Encargos (Pedidos a Futuro)</h2>
+        <p class="muted">Gestión de pedidos semanales y resumen consolidado para confección en taller.</p>
+      </div>
+      <div class="encargos-actions">
+        <button type="button" id="newEncargoBtn" class="btn btn-primary">➕ Nuevo Encargo</button>
+        <button type="button" id="printEncargosSummaryBtn" class="btn">🖨️ Imprimir Ticket Taller</button>
+      </div>
+    </div>
+
+    <nav class="encargos-tabs" role="tablist" aria-label="Pestañas de encargos">
+      <button type="button" id="tabSummaryBtn" class="tab active" data-subtab="summary">🧵 Resumen de Taller (Totales)</button>
+      <button type="button" id="tabClientsBtn" class="tab" data-subtab="clients">📋 Pedidos por Cliente (<span id="encargosCountText">0</span>)</button>
+      <button type="button" id="tabDeliveredBtn" class="tab" data-subtab="delivered">✅ Historial Entregados</button>
+    </nav>
+
+    <!-- Resumen Consolidado de Confección -->
+    <section id="encargosSummarySection" class="encargos-panel">
+      <div id="encargosSummaryContent" class="encargos-summary-content"></div>
+    </section>
+
+    <!-- Lista de Pedidos por Cliente -->
+    <section id="encargosClientsSection" class="encargos-panel" hidden>
+      <div id="encargosClientsList" class="encargos-cards-grid"></div>
+    </section>
+
+    <!-- Historial de Entregados -->
+    <section id="encargosDeliveredSection" class="encargos-panel" hidden>
+      <div id="encargosDeliveredList" class="encargos-cards-grid"></div>
+    </section>
   </main>
 
   <!-- ============ COMPROBANTE ============ -->
@@ -146,6 +201,23 @@
       </div>
     </div>
   </section>
+
+  <dialog id="clientPickerDialog" class="product-dialog" aria-labelledby="clientPickerTitle">
+    <div class="dialog-content">
+      <h2 id="clientPickerTitle">Directorio de Clientes</h2>
+      <p class="muted">Selecciona un cliente frecuente o escribe uno nuevo.</p>
+      <label class="field-label" for="clientPickerSearch">Nombre del cliente</label>
+      <input id="clientPickerSearch" type="text" maxlength="100" placeholder="Escribe el nombre del cliente..." autocomplete="off">
+      <div class="client-chips-container">
+        <p class="picker-subtitle">Clientes guardados:</p>
+        <div id="clientChipsList" class="client-chips-list"></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="closeClientPickerBtn" class="btn">Cerrar</button>
+        <button type="button" id="useClientPickerBtn" class="btn btn-primary">Usar este cliente</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="productDialog" class="product-dialog" aria-labelledby="productDialogTitle">
     <div class="dialog-content">

@@ -339,3 +339,55 @@ export function addSizeToProduct(editor, productName, rawSize, defaultPriceInput
   const next = editor.map((p) => (p.name.trim().toLocaleLowerCase('es') === target ? { ...p, sizes: updatedSizes } : p));
   return { ok: true, editor: next };
 }
+
+/**
+ * Consolida los artículos de una lista de encargos por Producto y Talla para el taller/confección.
+ * Ordena las tallas numéricas de menor a mayor y luego las tallas en letras estándar.
+ * @param {Array} encargos
+ * @returns {{ grandTotalQty: number, products: Array<{ name: string, subtotalQty: number, sizes: Array<{ size: string|number, quantity: number }> }> }}
+ */
+export function aggregateEncargosByProductAndSize(encargos) {
+  if (!Array.isArray(encargos)) return { grandTotalQty: 0, products: [] };
+  const byProduct = new Map();
+  let grandTotalQty = 0;
+
+  for (const enc of encargos) {
+    if (enc && enc.status && enc.status !== 'pending') continue;
+    if (!enc || !Array.isArray(enc.items)) continue;
+    for (const it of enc.items) {
+      const name = typeof it?.productName === 'string' ? it.productName.trim() : '';
+      if (!name) continue;
+      const size = it.size;
+      const qty = Number(it.quantity) || 0;
+      if (qty <= 0) continue;
+
+      grandTotalQty += qty;
+
+      if (!byProduct.has(name)) byProduct.set(name, new Map());
+      const sizeMap = byProduct.get(name);
+      const sk = sizeKey(size);
+      if (!sizeMap.has(sk)) {
+        sizeMap.set(sk, { size, quantity: 0 });
+      }
+      sizeMap.get(sk).quantity += qty;
+    }
+  }
+
+  const products = [];
+  for (const [name, sizeMap] of byProduct.entries()) {
+    const sortedSizes = [...sizeMap.values()].sort((a, b) => compareSizes(a.size, b.size));
+    const subtotalQty = sortedSizes.reduce((sum, s) => sum + s.quantity, 0);
+    products.push({
+      name,
+      subtotalQty,
+      sizes: sortedSizes,
+    });
+  }
+
+  products.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
+  return {
+    grandTotalQty,
+    products,
+  };
+}

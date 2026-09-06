@@ -5,6 +5,18 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Módulo de Encargos (Pedidos a futuro) y Gestión de Taller**:
+  - **Navegación principal de cabecera**: selector rápido entre *🛒 Ventas* y *📦 Encargos* con insignia numérica de pedidos pendientes.
+  - **Toma de pedidos ágil**: botón *"📦 Guardar como Encargo"* integrado directamente en el carrito móvil de venta para registrar prendas y tallas sin duplicar pantallas.
+  - **Modo Encargo**: soporte para notas especiales (ej. "Para el viernes / tela azul"), folio secuencial asignado y vinculación automática con el cliente.
+  - **Resumen consolidado de taller**: pestaña *🧵 Resumen de Taller* con agrupación automática por prenda y desglose ordenado por tallas para corte, costura y alistado.
+  - **Ticket térmico físico para taller (58 mm Bluetooth)**: comando de impresión de hoja de ruta con casillas de verificación `[ ]` tanto para el consolidado de confección como para el desglose por cliente.
+  - **Conversión de encargo a venta en 1 toque**: al entregar pedidos en la siguiente ruta semanal, *"🛒 Convertir a Venta"* carga todas las prendas al carrito, permitiendo ajustes rápidos y cerrando el encargo como entregado al cobrar.
+  - **Directorio y selector táctil de clientes**:
+    - Memoria local (`cm_clients`) y tabla SQLite (`clients`) para recordar clientes frecuentes.
+    - Autocompletado nativo en teclado móvil (`<datalist>`) y botón rápido *👥 Clientes* con modal de chips táctiles para selección inmediata en una pulsación.
+  - **Migración de esquema SQLite a versión 2**: tablas `clients`, `encargos` y `encargo_items` con soporte de migración automática sin pérdida de datos.
+  - **Caché PWA actualizada a `cm-sales-v15`** para propagación instantánea a dispositivos móviles.
 - **Prevención de solapamiento en botón "Finalizar venta"**: la barra flotante móvil (`#mobileCartBar`) ahora se oculta de forma dinámica e instantánea con `IntersectionObserver` cuando el botón *"Finalizar venta"* entra en el campo de visión del usuario, evitando cualquier interferencia táctil al momento de cobrar. Si el usuario sube a revisar productos, la barra reaparece automáticamente.
 - **Margen inferior ampliado en `#cartSection` y `body`**: mayor separación física contra el footer para garantizar que *"Finalizar venta"* tenga espacio libre completo y nunca se corte ni quede tapado.
 - **Caché PWA actualizada a `cm-sales-v14`** para actualización inmediata en todos los celulares y tablets conectados.

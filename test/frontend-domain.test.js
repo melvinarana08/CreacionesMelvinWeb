@@ -330,3 +330,62 @@ test('addSizeToProduct agrega talla normalizada y ordenada sin duplicados', () =
   assert.equal(dup.ok, false);
   assert.match(dup.reason, /ya existe/);
 });
+
+test('aggregateEncargosByProductAndSize consolida prendas y tallas ordenadas para taller', () => {
+  const sampleEncargos = [
+    {
+      id: 'e-1',
+      clientName: 'Doña Carmen',
+      status: 'pending',
+      items: [
+        { productName: 'Pantalón', size: 32, quantity: 2, unitPriceCents: 800 },
+        { productName: 'Camisa Escolar', size: 10, quantity: 3, unitPriceCents: 600 },
+      ],
+    },
+    {
+      id: 'e-2',
+      clientName: 'Don Roberto',
+      status: 'pending',
+      items: [
+        { productName: 'Pantalón', size: 32, quantity: 1, unitPriceCents: 800 },
+        { productName: 'Pantalón', size: 'M', quantity: 2, unitPriceCents: 850 },
+        { productName: 'Camisa Escolar', size: 12, quantity: 1, unitPriceCents: 650 },
+      ],
+    },
+    {
+      id: 'e-3',
+      clientName: 'Cliente Ya Entregado',
+      status: 'delivered', // no debe sumarse
+      items: [
+        { productName: 'Pantalón', size: 32, quantity: 5, unitPriceCents: 800 },
+      ],
+    },
+  ];
+
+  const res = D.aggregateEncargosByProductAndSize(sampleEncargos);
+  assert.equal(res.grandTotalQty, 9); // 2 + 3 + 1 + 2 + 1 = 9
+  assert.equal(res.products.length, 2);
+
+  // Orden alfabético: Camisa Escolar, Pantalón
+  const camisa = res.products.find((p) => p.name === 'Camisa Escolar');
+  assert.ok(camisa);
+  assert.equal(camisa.subtotalQty, 4);
+  assert.deepEqual(camisa.sizes, [
+    { size: 10, quantity: 3 },
+    { size: 12, quantity: 1 },
+  ]);
+
+  const pantalon = res.products.find((p) => p.name === 'Pantalón');
+  assert.ok(pantalon);
+  assert.equal(pantalon.subtotalQty, 5);
+  // Talla numérica (32) antes que letra ('M')
+  assert.deepEqual(pantalon.sizes, [
+    { size: 32, quantity: 3 },
+    { size: 'M', quantity: 2 },
+  ]);
+
+  // Manejo de encargos vacíos o inválidos
+  assert.deepEqual(D.aggregateEncargosByProductAndSize([]), { grandTotalQty: 0, products: [] });
+  assert.deepEqual(D.aggregateEncargosByProductAndSize(null), { grandTotalQty: 0, products: [] });
+});
+

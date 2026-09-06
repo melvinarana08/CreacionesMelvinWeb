@@ -65,7 +65,7 @@ test('backup produce snapshot consistente y la restauración preserva ventas y c
   assert.equal(items.length, 1);
   assert.equal(items[0].unit_price_cents, 650);
   const schemaVer = restored.prepare("SELECT value FROM meta WHERE key='schema_version'").get();
-  assert.equal(schemaVer.value, '1');
+  assert.equal(schemaVer.value, '2');
   restored.close();
 
   // El sha256 del respaldo coincide con el archivo verificado

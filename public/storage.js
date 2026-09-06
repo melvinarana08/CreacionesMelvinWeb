@@ -168,3 +168,29 @@ export function loadCart() {
 export function clearCart() {
   localStorage.removeItem(LS_CART);
 }
+
+const LS_CLIENTS = 'cm_clients';
+
+export function loadClients() {
+  try {
+    const raw = localStorage.getItem(LS_CLIENTS);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveClients(clients) {
+  if (!Array.isArray(clients)) return;
+  localStorage.setItem(LS_CLIENTS, JSON.stringify(clients.slice(0, 100)));
+}
+
+export function rememberClient(name) {
+  if (typeof name !== 'string') return;
+  const clean = name.trim();
+  if (!clean || clean.length > 100) return;
+  const list = loadClients().filter((c) => c.toLocaleLowerCase('es') !== clean.toLocaleLowerCase('es'));
+  list.unshift(clean);
+  saveClients(list);
+}

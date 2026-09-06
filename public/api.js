@@ -54,3 +54,16 @@ export const adminPutCatalog = (csrf, catalog) =>
   apiFetch('/api/admin/catalog', { method: 'PUT', body: { catalog }, csrf });
 export const adminAudit = (csrf, limit = 100) =>
   apiFetch(`/api/admin/audit?limit=${limit}`, { csrf });
+
+// Clientes y Encargos
+export const fetchClients = () => apiFetch('/api/clients');
+export const postClient = (name) => apiFetch('/api/clients', { method: 'POST', body: { name } });
+
+export const fetchEncargos = (sellerToken, status = 'pending') =>
+  apiFetch(`/api/encargos?status=${encodeURIComponent(status)}`, { sellerToken });
+export const postEncargo = (payload, sellerToken) =>
+  apiFetch('/api/encargos', { method: 'POST', body: payload, sellerToken });
+export const deliverEncargo = (id, saleId, sellerToken) =>
+  apiFetch(`/api/encargos/${encodeURIComponent(id)}/deliver`, { method: 'POST', body: { saleId }, sellerToken });
+export const cancelEncargo = (id, sellerToken) =>
+  apiFetch(`/api/encargos/${encodeURIComponent(id)}/cancel`, { method: 'POST', sellerToken });

@@ -100,11 +100,11 @@ test('barra móvil flotante y layout responsivo de tablet están presentes', () 
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app.js están alineados en caché v14', () => {
+test('service worker y app.js están alineados en caché v15', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v14/);
-  assert.match(app, /swVersion = 'v14'/);
+  assert.match(sw, /cm-sales-v15/);
+  assert.match(app, /swVersion = 'v15'/);
 });
 
 test('barra flotante móvil previene solapamiento con botón finalizar venta', () => {
@@ -125,4 +125,33 @@ test('controles para edición completa de catálogo (borrar, renombrar, gestiona
   assert.match(app, /renameProductInEditor/);
   assert.match(app, /deleteSizeFromProduct/);
   assert.match(app, /addSizeToProduct/);
+});
+
+test('módulo de Encargos, Taller y Directorio de Clientes existen en HTML, CSS y JS', () => {
+  for (const id of [
+    'navSalesBtn', 'navEncargosBtn', 'encargosBadge',
+    'cartTitle', 'cancelEncargoModeBtn', 'encargoNotesRow', 'encargoNotesInput',
+    'pickClientBtn', 'clientInput', 'clientsDatalist', 'saveAsEncargoBtn',
+    'encargosView', 'newEncargoBtn', 'printEncargosSummaryBtn',
+    'tabSummaryBtn', 'tabClientsBtn', 'tabDeliveredBtn', 'encargosCountText',
+    'encargosSummarySection', 'encargosClientsSection', 'encargosDeliveredSection',
+    'clientPickerDialog', 'clientPickerSearch', 'clientChipsList',
+    'closeClientPickerBtn', 'useClientPickerBtn'
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id} en index.html`);
+  }
+
+  assert.match(css, /\.encargos-view/);
+  assert.match(css, /\.workshop-summary-header/);
+  assert.match(css, /\.workshop-size-grid/);
+  assert.match(css, /\.client-chip/);
+  assert.match(css, /\.btn-encargo/);
+
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /enterEncargoMode/);
+  assert.match(app, /exitEncargoMode/);
+  assert.match(app, /saveCurrentCartAsEncargo/);
+  assert.match(app, /showEncargosView/);
+  assert.match(app, /convertEncargoToSale/);
+  assert.match(app, /openClientPicker/);
 });
