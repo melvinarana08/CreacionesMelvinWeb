@@ -75,8 +75,8 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - La caché PWA sube a `cm-sales-v10` para distribuir la presentación explícita del precio unitario.
 - La caché PWA sube a `cm-sales-v11` para distribuir las mejoras de selección, orden y presentación.
 
-### Sin cambios de backend
-- No se modificó API, esquema SQLite ni catálogo persistido; esta ventana solo cambia presentación y orden del frontend.
+### Compatibilidad de datos
+- No se modificaron los contratos de API, el esquema SQLite ni el catálogo persistido. El ajuste de backend se limita a conservar la idempotencia de reintentos por UUID frente a cambios posteriores de precio.
 
 ## [0.1.0] — 2026-08-24
 
