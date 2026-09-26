@@ -12,7 +12,9 @@ const LS_SELLER_TOKEN = 'cm_seller_token';
 const LS_CART = 'cm_cart';
 const LS_CATALOG = 'cm_catalog';
 const LS_PRINT_SUCCESSES = 'cm_print_successes';
+const LS_THEME = 'cm_theme';
 const LS_EINK_MODE = 'cm_eink_mode';
+const VALID_THEMES = new Set(['light', 'dark', 'eink']);
 
 export const RECENT_LOCAL_SALES_LIMIT = 20;
 
@@ -191,19 +193,51 @@ export function clearCart() {
   localStorage.removeItem(LS_CART);
 }
 
-export function loadEinkMode(storage = globalThis.localStorage) {
+export function loadTheme(storage = globalThis.localStorage) {
   try {
-    return storage?.getItem(LS_EINK_MODE) === 'true';
+    const storedTheme = storage?.getItem(LS_THEME);
+    if (VALID_THEMES.has(storedTheme)) return storedTheme;
+    if (storedTheme !== null) return 'light';
+    if (storage?.getItem(LS_EINK_MODE) === 'true') {
+      saveTheme('eink', storage);
+      return 'eink';
+    }
   } catch {
-    return false;
+    return 'light';
+  }
+  return 'light';
+}
+
+function restoreStorageValue(storage, key, value) {
+  try {
+    if (value === null) storage.removeItem(key);
+    else storage.setItem(key, value);
+  } catch {
+    // Rollback is best-effort when storage access is blocked.
   }
 }
 
-export function saveEinkMode(enabled, storage = globalThis.localStorage) {
+export function saveTheme(theme, storage = globalThis.localStorage) {
+  if (!VALID_THEMES.has(theme)
+    || typeof storage?.getItem !== 'function'
+    || typeof storage?.setItem !== 'function'
+    || typeof storage?.removeItem !== 'function') return false;
+
+  let priorTheme;
+  let priorEinkMode;
+  let snapshotsReady = false;
   try {
-    storage?.setItem(LS_EINK_MODE, enabled ? 'true' : 'false');
+    priorTheme = storage.getItem(LS_THEME);
+    priorEinkMode = storage.getItem(LS_EINK_MODE);
+    snapshotsReady = true;
+    storage.setItem(LS_THEME, theme);
+    storage.setItem(LS_EINK_MODE, theme === 'eink' ? 'true' : 'false');
     return true;
   } catch {
+    if (snapshotsReady) {
+      restoreStorageValue(storage, LS_THEME, priorTheme);
+      restoreStorageValue(storage, LS_EINK_MODE, priorEinkMode);
+    }
     return false;
   }
 }

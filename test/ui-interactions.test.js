@@ -4,7 +4,10 @@ import {
   applySelectedCustomer,
   clampQuantity,
   downloadFileWithObjectUrl,
+  filterCustomerSuggestions,
   performShare,
+  shouldDismissCustomerSuggestions,
+  shouldShowCustomerSuggestions,
   updateQuantityControls,
   updateSizeChipSelection,
 } from '../public/ui-interactions.js';
@@ -61,16 +64,44 @@ test('cantidad se limita a 1–99 y actualiza límites y presets exactos', () =>
   assert.equal(plusButton.disabled, true);
 });
 
-test('selección de cliente cierra, devuelve foco y anuncia el nombre', () => {
+test('selección de cliente cierra, oculta sugerencias, devuelve foco y anuncia el nombre', () => {
   const calls = [];
   const input = { value: '', focus: () => calls.push('focus') };
   const dialog = { close: () => calls.push('close') };
+  const suggestions = { hidden: false };
   const status = { hidden: true, textContent: '' };
-  assert.equal(applySelectedCustomer({ name: '  María Pérez ', input, dialog, status }), true);
+  assert.equal(applySelectedCustomer({ name: '  María Pérez ', input, dialog, suggestions, status }), true);
   assert.equal(input.value, 'María Pérez');
+  assert.equal(suggestions.hidden, true);
   assert.deepEqual(calls, ['close', 'focus']);
   assert.equal(status.hidden, false);
   assert.equal(status.textContent, 'Cliente elegido: María Pérez');
+});
+
+test('sugerencias filtran por subcadena sin distinguir mayúsculas, conservan recencia y limitan a 8', () => {
+  const names = ['María reciente', 'Carlos', 'MARÍA segunda', 'Ana', 'Beto', 'Cora', 'Dora', 'Elena', 'Fabi', 'Gabi'];
+  assert.deepEqual(filterCustomerSuggestions(names, 'maría'), ['María reciente', 'MARÍA segunda']);
+  assert.deepEqual(filterCustomerSuggestions(names, '').slice(0, 2), ['María reciente', 'Carlos']);
+  assert.equal(filterCustomerSuggestions(names, '').length, 8);
+  assert.deepEqual(filterCustomerSuggestions([' Ana ', 'ana', '', null], ''), ['Ana']);
+});
+
+test('sugerencias solo se muestran durante interacción y con coincidencias', () => {
+  assert.equal(shouldShowCustomerSuggestions({ engaged: true, matches: ['Ana'] }), true);
+  assert.equal(shouldShowCustomerSuggestions({ engaged: false, matches: ['Ana'] }), false);
+  assert.equal(shouldShowCustomerSuggestions({ engaged: true, matches: [] }), false);
+});
+
+test('Escape, puntero exterior y salida de foco cierran sin tragarse selección táctil', () => {
+  const input = {};
+  const suggestionButton = {};
+  const suggestions = { contains: (node) => node === suggestionButton };
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'keydown', key: 'Escape' }), true);
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'keydown', key: 'Enter' }), false);
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'pointerdown', target: suggestionButton, input, suggestions }), false);
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'pointerdown', target: {}, input, suggestions }), true);
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'focusout', relatedTarget: suggestionButton, input, suggestions }), false);
+  assert.equal(shouldDismissCustomerSuggestions({ type: 'focusout', relatedTarget: {}, input, suggestions }), true);
 });
 
 test('descarga con URL temporal y difiere su revocación a una macrotarea', () => {

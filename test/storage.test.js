@@ -38,20 +38,84 @@ test('loadCatalog devuelve null si no hay caché o está dañada', () => {
   assert.equal(S.loadCatalog(), null);
 });
 
-test('modo e-ink persiste booleano y tolera almacenamiento bloqueado', () => {
-  assert.equal(S.loadEinkMode(), false);
-  assert.equal(S.saveEinkMode(true), true);
-  assert.equal(S.loadEinkMode(), true);
-  assert.equal(localStorage.getItem('cm_eink_mode'), 'true');
-  assert.equal(S.saveEinkMode(false), true);
-  assert.equal(S.loadEinkMode(), false);
+test('tema persiste valores válidos y refleja la compatibilidad e-ink', () => {
+  for (const theme of ['light', 'dark', 'eink']) {
+    assert.equal(S.saveTheme(theme), true);
+    assert.equal(S.loadTheme(), theme);
+    assert.equal(localStorage.getItem('cm_theme'), theme);
+    assert.equal(localStorage.getItem('cm_eink_mode'), theme === 'eink' ? 'true' : 'false');
+  }
+  assert.equal(S.saveTheme('sepia'), false);
+  assert.equal(S.loadTheme(), 'eink', 'un valor rechazado no modifica el tema anterior');
+});
 
+test('tema prioriza la clave nueva válida sobre el legado', () => {
+  localStorage.setItem('cm_theme', 'dark');
+  localStorage.setItem('cm_eink_mode', 'true');
+  assert.equal(S.loadTheme(), 'dark');
+  assert.equal(localStorage.getItem('cm_theme'), 'dark');
+});
+
+test('tema malformado devuelve claro sin migrar el legado verdadero', () => {
+  localStorage.setItem('cm_theme', 'malformed');
+  localStorage.setItem('cm_eink_mode', 'true');
+  assert.equal(S.loadTheme(), 'light');
+  assert.equal(localStorage.getItem('cm_theme'), 'malformed');
+  assert.equal(localStorage.getItem('cm_eink_mode'), 'true');
+});
+
+test('tema ausente migra el legado verdadero a e-ink', () => {
+  localStorage.setItem('cm_eink_mode', 'true');
+  assert.equal(S.loadTheme(), 'eink');
+  assert.equal(localStorage.getItem('cm_theme'), 'eink');
+  assert.equal(localStorage.getItem('cm_eink_mode'), 'true');
+});
+
+test('tema vuelve a claro y no lanza cuando cualquier acceso está bloqueado', () => {
   const blocked = {
-    getItem() { throw new Error('bloqueado'); },
-    setItem() { throw new Error('bloqueado'); },
+    getItem() { throw new Error('get bloqueado'); },
+    setItem() { throw new Error('set bloqueado'); },
+    removeItem() { throw new Error('remove bloqueado'); },
   };
-  assert.equal(S.loadEinkMode(blocked), false);
-  assert.equal(S.saveEinkMode(true, blocked), false);
+  assert.equal(S.loadTheme(blocked), 'light');
+  assert.equal(S.saveTheme('dark', blocked), false);
+
+  const blockedSet = new MemoryStorage();
+  blockedSet.setItem = () => { throw new Error('set bloqueado'); };
+  assert.equal(S.saveTheme('dark', blockedSet), false);
+
+  let writes = 0;
+  const blockedRemove = {
+    getItem() { return null; },
+    setItem() {
+      writes += 1;
+      if (writes === 2) throw new Error('segundo set bloqueado');
+    },
+    removeItem() { throw new Error('remove bloqueado'); },
+  };
+  assert.equal(S.saveTheme('dark', blockedRemove), false);
+  assert.equal(S.loadTheme(null), 'light');
+  assert.equal(S.saveTheme('dark', null), false);
+});
+
+test('tema revierte ambas claves si falla una vez la segunda escritura', () => {
+  class FailSecondWriteStorage extends MemoryStorage {
+    constructor() {
+      super();
+      this.values.set('cm_eink_mode', 'true');
+      this.writeCount = 0;
+    }
+    setItem(key, value) {
+      this.writeCount += 1;
+      if (this.writeCount === 2) throw new Error('fallo único en espejo legado');
+      super.setItem(key, value);
+    }
+  }
+
+  const storage = new FailSecondWriteStorage();
+  assert.equal(S.saveTheme('dark', storage), false);
+  assert.equal(storage.getItem('cm_theme'), null, 'restaura la ausencia de la clave nueva');
+  assert.equal(storage.getItem('cm_eink_mode'), 'true', 'restaura el valor legado exacto');
 });
 
 test('seguimiento de impresión exitosa se guarda por clave estable', () => {

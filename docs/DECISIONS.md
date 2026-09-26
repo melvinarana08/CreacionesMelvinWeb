@@ -13,23 +13,31 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
   Sin soporte o ante un fallo no cancelado, descarga el PNG mediante una URL temporal y
   copia el texto; si el portapapeles no está disponible, ofrece copia manual. Una
   cancelación `AbortError` no provoca descargas, copias ni diálogos.
+- **Orden legible:** las líneas del PNG y del respaldo en texto presentan primero el nombre
+  completo del producto y luego cantidad/talla (`Camisa · 4 # 5`). El ajuste conserva los
+  nombres largos; el DOM y la impresión térmica ya eran producto-primero y no se modifican.
 - **Identidad y privacidad:** un ticket pendiente se identifica como pendiente y nunca
   inventa un folio. La imagen se genera en el dispositivo; no se sube a un servicio, la app
   no elige destinatarios ni comparte en segundo plano, y el usuario confirma el destino.
 
-## 18. Controles móviles y modo e-ink explícito (2026-09-25)
+## 18. Temas y controles móviles explícitos (2026-09-25)
 
-- **Decisión:** el campo principal se presenta como **Cliente (opcional)** con semántica de
-  nombre y un selector propio de clientes guardados, sin `datalist` paralelo. Las cantidades
-  rápidas son valores exactos **1, 3, 5 y 12**; −/+ conserva el ajuste fino y el rango 1–99.
-- **E-ink y accesibilidad:** un botón visible guarda `cm_eink_mode` en `localStorage` de
-  forma tolerante a bloqueos y aplica `.eink-mode` en la raíz. El modo usa blanco/negro,
-  bordes sólidos y marcas de texto/contorno; elimina sombras, transparencias y movimiento.
-  `prefers-reduced-motion` y `forced-colors` se atienden por separado, sin inventar una
-  media query de e-ink. Los controles directamente implicados mantienen 44 px como mínimo.
-- **Por qué:** los navegadores no detectan de forma fiable el hardware e-ink. Un control
-  persistido deja la decisión al operador, mientras los presets y la semántica de cliente
-  reducen toques y errores sin cambiar contratos de venta ni datos almacenados.
+- **Temas:** un selector nativo visible persiste `cm_theme` como `light|dark|eink` y refleja
+  `cm_eink_mode` para permitir rollback. Una clave nueva válida tiene prioridad. Solo cuando
+  `cm_theme` no existe, el legado `cm_eink_mode=true` migra a E-ink; si tampoco es `true`,
+  cae en Claro. Una clave nueva presente pero inválida, o almacenamiento inaccesible, cae en
+  Claro sin activar la migración. Noche conserva color, movimiento y háptica; solo E-ink aplica `.eink-mode`, blanco/negro,
+  bordes fuertes y ausencia de sombras, transparencias, movimiento y vibración.
+- **Clientes:** el campo principal sigue siendo texto libre y opcional. Al recibir foco o
+  toque muestra hasta ocho nombres recientes de la fuente local/servidor, filtrados por
+  subcadena, como botones de 44 px; el diálogo completo permanece para listas mayores.
+  Escape, selección, foco exterior o puntero exterior cierran la región sin perder el toque.
+- **Credenciales:** `autocomplete="off"` y `sale-customer-display-name` reducen que Chrome
+  confunda el cliente con un usuario. La contraseña admin vive en un formulario explícito
+  y conserva `current-password`. Estas pistas son heurísticas y no garantizan obediencia del
+  navegador; se descartan señuelos ocultos, `new-password`, `readonly` y atributos privados.
+- **Accesibilidad:** `prefers-reduced-motion` y `forced-colors` se atienden por separado. El
+  selector de tema, las sugerencias y los controles implicados mantienen 44 px como mínimo.
 
 ## 15. Navegación: salir de administración regresa a la venta (2026-08-28)
 

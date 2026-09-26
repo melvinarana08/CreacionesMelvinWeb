@@ -10,8 +10,44 @@
   --danger: #b91c1c;
   --ok: #15803d;
   --warn: #b45309;
+  --surface-soft: #f1f5f9;
+  --surface-muted: #e2e8f0;
+  --accent-soft: #f0fdfa;
+  --accent-border: #99f6e4;
+  --success-bg: #dcfce7;
+  --success-border: #86efac;
+  --danger-bg: #fee2e2;
+  --danger-border: #fca5a5;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --amber-foreground: #111827;
   --radius: 12px;
   --shadow: 0 1px 3px rgba(15, 23, 42, .12);
+}
+
+:root[data-theme="dark"] {
+  --teal: #0f766e;
+  --teal-dark: #5eead4;
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #f8fafc;
+  --muted: #cbd5e1;
+  --border: #475569;
+  --danger: #fca5a5;
+  --ok: #86efac;
+  --warn: #fcd34d;
+  --surface-soft: #273449;
+  --surface-muted: #334155;
+  --accent-soft: #134e4a;
+  --accent-border: #2dd4bf;
+  --success-bg: #14532d;
+  --success-border: #22c55e;
+  --danger-bg: #450a0a;
+  --danger-border: #ef4444;
+  --warning-bg: #422006;
+  --warning-text: #fde68a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .55);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -76,7 +112,7 @@ h3 { font-size: .95rem; }
 }
 .badge {
   background: #f59e0b;
-  color: #fff;
+  color: var(--amber-foreground);
   border-radius: 999px;
   padding: .05rem .4rem;
   font-size: .75rem;
@@ -84,7 +120,8 @@ h3 { font-size: .95rem; }
 }
 
 .status-bar { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; font-size: .8rem; }
-.eink-toggle { min-height: 44px; white-space: normal; }
+.theme-control { display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; }
+.theme-control select { min-height: 44px; max-width: 8rem; padding: .45rem 1.8rem .45rem .6rem; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; }
 .dot-on { background: var(--ok); }
 .dot-off { background: var(--danger); }
@@ -227,6 +264,8 @@ input {
   padding: .55rem .7rem;
   width: 140px;
   text-align: right;
+  background: var(--card);
+  color: var(--text);
 }
 input:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 select {
@@ -246,9 +285,9 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
   font-size: .9rem;
   font-weight: 600;
 }
-.status-text.saving { color: var(--teal-dark); background: #ccfbf1; border: 1px solid #5eead4; }
-.status-text.success { color: var(--ok); background: #dcfce7; border: 1px solid #86efac; }
-.status-text.failure { color: var(--danger); background: #fee2e2; border: 1px solid #fca5a5; }
+.status-text.saving { color: var(--teal-dark); background: var(--accent-soft); border: 1px solid var(--accent-border); }
+.status-text.success { color: var(--ok); background: var(--success-bg); border: 1px solid var(--success-border); }
+.status-text.failure { color: var(--danger); background: var(--danger-bg); border: 1px solid var(--danger-border); }
 
 .receipt-body { border: 1px dashed var(--border); border-radius: var(--radius); padding: .75rem; margin: .75rem 0; }
 .receipt-status { font-weight: 600; }
@@ -351,6 +390,8 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
   border: 0;
   border-radius: var(--radius);
   padding: 0;
+  background: var(--card);
+  color: var(--text);
   box-shadow: 0 20px 50px rgba(15, 23, 42, .3);
 }
 .product-dialog::backdrop { background: rgba(15, 23, 42, .55); }
@@ -508,7 +549,7 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 }
 #clientInput, #clientPickerSearch, .btn-pick-client, .client-chip,
 #clientPickerDialog .dialog-actions .btn, .receipt-actions .btn,
-.btn.btn-small.eink-toggle {
+.inline-client-suggestion, .theme-control select {
   min-height: 44px;
 }
 .client-row {
@@ -525,11 +566,34 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
   font-size: .8rem;
   padding: .45rem .65rem;
   border-radius: 6px;
-  background: #f0fdfa;
+  background: var(--accent-soft);
   color: var(--teal-dark);
-  border-color: #99f6e4;
+  border-color: var(--accent-border);
   font-weight: 600;
 }
+.inline-client-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  padding: .45rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+.inline-client-suggestion {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .55rem .75rem;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.inline-client-suggestion:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .cart-buttons-group {
   display: grid;
   gap: .5rem;
@@ -538,11 +602,12 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .btn-encargo {
   background: #f59e0b;
   border-color: #d97706;
-  color: #fff;
+  color: var(--amber-foreground);
   font-weight: 700;
 }
 .btn-encargo:active {
   background: #d97706;
+  color: var(--amber-foreground);
 }
 
 /* Vista de Encargos */
@@ -751,6 +816,37 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .field-help { color: var(--muted); }
 .selection-status { font-weight: 700; }
 
+:root[data-theme="dark"] .nav-btn.active,
+:root[data-theme="dark"] .mobile-cart-bar .btn { background: var(--card); color: var(--text); border-color: var(--border); }
+:root[data-theme="dark"] .size-picker,
+:root[data-theme="dark"] .tab,
+:root[data-theme="dark"] .client-chip,
+:root[data-theme="dark"] .btn-icon:active,
+:root[data-theme="dark"] .workshop-size-chip,
+:root[data-theme="dark"] .encargo-card.delivered { background: var(--surface-soft); }
+:root[data-theme="dark"] .cart-item,
+:root[data-theme="dark"] .admin-item,
+:root[data-theme="dark"] .price-card,
+:root[data-theme="dark"] .local-sale-button,
+:root[data-theme="dark"] .encargo-card,
+:root[data-theme="dark"] .workshop-prod-card { background: var(--card); }
+:root[data-theme="dark"] .btn-price-lookup,
+:root[data-theme="dark"] .btn-reprint,
+:root[data-theme="dark"] .workshop-summary-header { background: var(--accent-soft); border-color: var(--accent-border); color: var(--text); }
+:root[data-theme="dark"] .btn-price-lookup:active,
+:root[data-theme="dark"] .mobile-cart-bar .btn:active,
+:root[data-theme="dark"] .client-chip:hover,
+:root[data-theme="dark"] .client-chip:active { background: var(--surface-muted); }
+:root[data-theme="dark"] .btn-danger-soft,
+:root[data-theme="dark"] .btn-danger-soft:active,
+:root[data-theme="dark"] .btn-delete-size,
+:root[data-theme="dark"] .btn-delete-size:active { background: var(--danger-bg); border-color: var(--danger-border); }
+:root[data-theme="dark"] .pending-badge,
+:root[data-theme="dark"] .badge-pending { background: var(--warning-bg); color: var(--warning-text); }
+:root[data-theme="dark"] .badge-delivered { background: var(--success-bg); color: var(--ok); }
+:root[data-theme="dark"] .badge-cancelled { background: var(--danger-bg); color: var(--danger); }
+:root[data-theme="dark"] .encargo-items-list { border-color: var(--border); }
+
 @media (min-width: 768px) and (max-height: 620px) {
   .app-header { position: static; }
   #saleView #cartSection { position: static; max-height: none; overflow: visible; }
@@ -766,7 +862,7 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 }
 
 @media (forced-colors: active) {
-  .btn, input, select, .card, .size-picker, .status-text, .client-chip, .receipt-body {
+  .btn, input, select, .card, .size-picker, .status-text, .client-chip, .inline-client-suggestion, .receipt-body {
     border: 2px solid CanvasText;
   }
   .btn:focus-visible, input:focus-visible, select:focus-visible,
@@ -799,7 +895,8 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 }
 .eink-mode .app-header, .eink-mode .mobile-cart-bar, .eink-mode .app-footer,
 .eink-mode .card, .eink-mode .size-picker, .eink-mode .btn, .eink-mode input,
-.eink-mode select, .eink-mode .status-text, .eink-mode .client-chip,
+.eink-mode select, .eink-mode .status-text, .eink-mode .client-chip, .eink-mode .inline-client-suggestions,
+.eink-mode .inline-client-suggestion,
 .eink-mode .receipt-body, .eink-mode .encargo-card, .eink-mode .price-card {
   color: #000;
   background: #fff;

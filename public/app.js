@@ -11,7 +11,10 @@ import { createReceiptPngFile, receiptImageFilename } from './receipt-image.js';
 import {
   applySelectedCustomer,
   downloadFileWithObjectUrl,
+  filterCustomerSuggestions,
   performShare,
+  shouldDismissCustomerSuggestions,
+  shouldShowCustomerSuggestions,
   updateQuantityControls,
   updateSizeChipSelection,
 } from './ui-interactions.js';
@@ -38,6 +41,7 @@ const state = {
   finishBtnVisible: false,
   encargos: [],
   clients: S.loadClients(),
+  customerSuggestionsEngaged: false,
   encargoMode: false,
   activeEncargoId: null,
   encargosSubtab: 'summary',
@@ -1522,6 +1526,7 @@ async function printEncargosSummaryTicketAction(event) {
 
 async function loadClientsList() {
   state.clients = S.loadClients();
+  if (state.customerSuggestionsEngaged) renderInlineCustomerSuggestions();
   try {
     const res = await Api.fetchClients();
     if (res.ok && Array.isArray(res.data?.clients)) {
@@ -1529,6 +1534,7 @@ async function loadClientsList() {
         if (c && c.name) S.rememberClient(c.name);
       }
       state.clients = S.loadClients();
+      if (state.customerSuggestionsEngaged) renderInlineCustomerSuggestions();
     }
   } catch {
     /* offline */
@@ -1543,15 +1549,51 @@ function openClientPicker() {
   searchInput.focus();
 }
 
+function hideInlineCustomerSuggestions() {
+  state.customerSuggestionsEngaged = false;
+  $('inlineClientSuggestions').hidden = true;
+  $('clientInput').setAttribute('aria-expanded', 'false');
+}
+
+function renderInlineCustomerSuggestions() {
+  const input = $('clientInput');
+  const container = $('inlineClientSuggestions');
+  const matches = filterCustomerSuggestions(state.clients, input.value);
+  container.replaceChildren();
+  if (!shouldShowCustomerSuggestions({ engaged: state.customerSuggestionsEngaged, matches })) {
+    container.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  for (const name of matches) {
+    const button = el('button', 'inline-client-suggestion', name);
+    button.type = 'button';
+    button.addEventListener('pointerdown', (event) => event.preventDefault());
+    button.addEventListener('click', () => chooseCustomer(name));
+    container.append(button);
+  }
+  container.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function showInlineCustomerSuggestions() {
+  state.customerSuggestionsEngaged = true;
+  renderInlineCustomerSuggestions();
+}
+
 function chooseCustomer(name) {
   const selected = applySelectedCustomer({
     name,
     input: $('clientInput'),
     dialog: $('clientPickerDialog'),
+    suggestions: $('inlineClientSuggestions'),
     status: $('clientSelectionStatus'),
   });
   if (!selected) return;
+  state.customerSuggestionsEngaged = false;
+  $('clientInput').setAttribute('aria-expanded', 'false');
   S.rememberClient(name);
+  state.clients = S.loadClients();
   loadClientsList();
 }
 
@@ -1596,15 +1638,18 @@ async function loadCatalog() {
   renderStatus();
 }
 
-function applyEinkMode(enabled) {
-  document.documentElement.classList.toggle('eink-mode', enabled);
-  const button = $('einkModeBtn');
-  button.setAttribute('aria-pressed', String(enabled));
-  button.textContent = enabled ? '✓ Modo e-ink: activado' : 'Modo e-ink: desactivado';
+const THEME_COLORS = Object.freeze({ light: '#0f766e', dark: '#0f172a', eink: '#ffffff' });
+
+function applyTheme(theme) {
+  const selectedTheme = Object.hasOwn(THEME_COLORS, theme) ? theme : 'light';
+  document.documentElement.dataset.theme = selectedTheme;
+  document.documentElement.classList.toggle('eink-mode', selectedTheme === 'eink');
+  $('themeSelect').value = selectedTheme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[selectedTheme]);
 }
 
 async function init() {
-  applyEinkMode(S.loadEinkMode());
+  applyTheme(S.loadTheme());
 
   // Service worker (PWA)
   if ('serviceWorker' in navigator) {
@@ -1713,10 +1758,9 @@ async function init() {
     input.type = isPassword ? 'text' : 'password';
     btn.textContent = isPassword ? '🙈' : '👁️';
   });
-  $('einkModeBtn').addEventListener('click', () => {
-    const enabled = !document.documentElement.classList.contains('eink-mode');
-    applyEinkMode(enabled);
-    S.saveEinkMode(enabled);
+  $('themeSelect').addEventListener('change', (event) => {
+    applyTheme(event.currentTarget.value);
+    S.saveTheme(event.currentTarget.value);
   });
   $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
   $('pricesBtn').addEventListener('click', openPricesDialog);
@@ -1725,7 +1769,8 @@ async function init() {
 
   // Admin
   $('adminLink').addEventListener('click', showAdminLogin);
-  $('adminLoginBtn').addEventListener('click', async () => {
+  $('adminLogin').addEventListener('submit', async (event) => {
+    event.preventDefault();
     const password = $('adminPasswordInput').value;
     if (!password) return;
     const res = await Api.adminLogin(password);
@@ -1805,6 +1850,30 @@ async function init() {
   $('clientPickerSearch').addEventListener('input', () => {
     renderClientChips($('clientPickerSearch').value);
   });
+  const clientInput = $('clientInput');
+  const inlineSuggestions = $('inlineClientSuggestions');
+  clientInput.addEventListener('focus', showInlineCustomerSuggestions);
+  clientInput.addEventListener('pointerdown', showInlineCustomerSuggestions);
+  clientInput.addEventListener('input', renderInlineCustomerSuggestions);
+  clientInput.addEventListener('keydown', (event) => {
+    if (shouldDismissCustomerSuggestions({ type: 'keydown', key: event.key })) hideInlineCustomerSuggestions();
+  });
+  const deferCustomerFocusDismissal = (event) => {
+    const nextTarget = event.relatedTarget;
+    setTimeout(() => {
+      const relatedTarget = nextTarget || document.activeElement;
+      if (shouldDismissCustomerSuggestions({
+        type: 'focusout', relatedTarget, input: clientInput, suggestions: inlineSuggestions,
+      })) hideInlineCustomerSuggestions();
+    }, 0);
+  };
+  clientInput.addEventListener('focusout', deferCustomerFocusDismissal);
+  inlineSuggestions.addEventListener('focusout', deferCustomerFocusDismissal);
+  document.addEventListener('pointerdown', (event) => {
+    if (shouldDismissCustomerSuggestions({
+      type: 'pointerdown', target: event.target, input: clientInput, suggestions: inlineSuggestions,
+    })) hideInlineCustomerSuggestions();
+  });
 
   setQuantity(state.qty);
   renderCart();
@@ -1824,7 +1893,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v19';
+  const swVersion = 'v20';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

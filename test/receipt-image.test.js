@@ -32,7 +32,7 @@ test('layout conserva contenido, Unicode, cantidad 99, importes y cierre', () =>
   assert.match(text, /Creaciones Melvin/);
   assert.match(text, /Folio: 42/);
   assert.match(text, /Cliente: María José/);
-  assert.match(text, /Cantidad # Talla/);
+  assert.match(text, /Producto · Cantidad # Talla/);
   assert.match(text, /99 # A medida/);
   assert.match(text, /Ñandutí/);
   assert.match(text, /Unitario\s+\$6\.25/);
@@ -41,6 +41,11 @@ test('layout conserva contenido, Unicode, cantidad 99, importes y cierre', () =>
   assert.match(text, /TOTAL/);
   assert.match(text, /Gracias por su\s+compra/);
   assert.ok(layout.height > 480, 'el alto crece con contenido envuelto');
+  const flattened = layout.commands.filter((c) => c.type === 'text').map((c) => c.text).join(' ');
+  assert.ok(
+    flattened.includes('Camisa escolar manga larga edición especial · 99 # A medida'),
+    'el nombre largo se conserva completo y aparece antes de cantidad/talla'
+  );
 });
 
 test('layout pendiente omite cliente/descuento y respeta tamaños acotados', () => {

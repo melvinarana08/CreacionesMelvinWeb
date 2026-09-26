@@ -107,10 +107,10 @@ export function buildReceiptLayout(receipt, options = {}) {
   if (receipt.savedAt) addText(`Fecha: ${receipt.savedAt}`, { size: config.smallFontSize });
   if (receipt.clientName) addText(`Cliente: ${receipt.clientName}`, { size: config.smallFontSize });
   addRule();
-  addText('Cantidad # Talla', { size: config.smallFontSize, weight: '700' });
+  addText('Producto · Cantidad # Talla', { size: config.smallFontSize, weight: '700' });
 
   for (const line of receipt.lines) {
-    addText(`${line.quantity} # ${line.size} · ${line.product}`, { weight: '700', gap: 5 });
+    addText(`${line.product} · ${line.quantity} # ${line.size}`, { weight: '700', gap: 5 });
     addPair(`Unitario ${money(line.unitPriceCents)}`, `Importe ${money(line.unitPriceCents * line.quantity)}`);
   }
   addRule();

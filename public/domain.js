@@ -155,11 +155,11 @@ export function formatShareTicket(receipt) {
   ];
   if (receipt.savedAt) rows.push(`Fecha: ${receipt.savedAt}`);
   if (receipt.clientName) rows.push(`Cliente: ${receipt.clientName}`);
-  rows.push('', 'Cantidad # Talla');
+  rows.push('', 'Producto · Cantidad # Talla');
   for (const line of receipt.lines) {
     const lineTotal = computeLineTotal(line.unitPriceCents, line.quantity);
     rows.push(
-      `${line.quantity} # ${line.size} · ${line.product}`,
+      `${line.product} · ${line.quantity} # ${line.size}`,
       `Unitario ${formatUSD(line.unitPriceCents)} · Importe ${formatUSD(lineTotal)}`
     );
   }

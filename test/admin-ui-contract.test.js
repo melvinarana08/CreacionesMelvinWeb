@@ -133,13 +133,13 @@ test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaj
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app están alineados en caché v19 y precargan el PNG', () => {
+test('service worker y app están alineados en caché v20 y precargan el shell cambiado', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v19/);
+  assert.match(sw, /cm-sales-v20/);
   assert.match(sw, /'\/ui-interactions\.js'/);
   assert.match(sw, /'\/receipt-image\.js'/);
-  assert.match(app, /swVersion = 'v19'/);
+  assert.match(app, /swVersion = 'v20'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
   assert.match(app, /from '\.\/receipt-image\.js'/);
 });
@@ -246,27 +246,62 @@ test('módulo de Encargos, Taller y Directorio de Clientes existen en HTML, CSS 
   assert.doesNotMatch(html, /clientsDatalist|<datalist/i);
 });
 
-test('cliente opcional usa semántica móvil y selector accesible autoritativo', () => {
-  assert.match(html, /<label for="clientInput">Cliente \(opcional\)<\/label>/);
-  assert.match(html, /id="clientInput"[^>]*name="customer-name"[^>]*autocomplete="name"[^>]*inputmode="text"[^>]*autocapitalize="words"[^>]*enterkeyhint="done"[^>]*aria-describedby="clientHelp clientSelectionStatus"/);
-  assert.match(html, /id="pickClientBtn"[^>]*>Elegir cliente guardado<\/button>/);
-  assert.match(html, /id="clientPickerSearch"[^>]*name="saved-customer-search"[^>]*type="search"/);
-  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(app, /applySelectedCustomer/);
-  assert.match(css, /#clientInput[^}]*min-height:\s*44px/s);
-  assert.match(css, /\.client-chip[\s\S]*min-height:\s*44px/);
+test('badges y botones ámbar conservan texto oscuro accesible en todos los temas', () => {
+  assert.match(css, /--amber-foreground:\s*#111827;/);
+  for (const selector of ['.badge', '.btn-encargo', '.btn-encargo:active']) {
+    const escapedSelector = selector.replaceAll('.', '\\.');
+    const rule = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))?.[1] || '';
+    assert.match(rule, /color:\s*var\(--amber-foreground\)/, `${selector} debe conservar texto oscuro`);
+    assert.doesNotMatch(rule, /color:\s*(?:#fff(?:fff)?|white)\b/i, `${selector} no debe usar texto blanco sobre ámbar`);
+  }
 });
 
-test('modo e-ink persiste en la raíz y respeta contraste y preferencias del sistema', () => {
-  assert.ok(html.includes('id="einkModeBtn"'));
+test('cliente opcional usa hints no-login y sugerencias inline táctiles', () => {
+  assert.match(html, /<label for="clientInput">Cliente \(opcional\)<\/label>/);
+  const clientInputTag = html.match(/<input[^>]*id="clientInput"[^>]*>/)?.[0] || '';
+  for (const attribute of [
+    'name="sale-customer-display-name"', 'type="text"', 'autocomplete="off"',
+    'inputmode="text"', 'autocapitalize="words"', 'maxlength="100"',
+  ]) assert.ok(clientInputTag.includes(attribute), `falta ${attribute}`);
+  assert.match(html, /id="inlineClientSuggestions"[^>]*aria-label="Clientes guardados recientes"/);
+  assert.match(html, /id="pickClientBtn"[^>]*>Elegir cliente guardado<\/button>/);
+  assert.match(html, /id="clientPickerSearch"[^>]*name="saved-customer-search"[^>]*type="search"/);
+  assert.doesNotMatch(html, /id="clientInput"[^>]*(?:autocomplete="name"|name="(?:user|username|customer-name)")/);
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(app, /applyEinkMode\(S\.loadEinkMode\(\)\)/);
-  assert.match(app, /document\.documentElement\.classList\.toggle\('eink-mode'/);
-  assert.match(app, /S\.saveEinkMode\(enabled\)/);
+  assert.match(app, /filterCustomerSuggestions/);
+  assert.match(app, /pointerdown[\s\S]*preventDefault/);
+  assert.match(app, /deferCustomerFocusDismissal[\s\S]*setTimeout\(\(\) =>/);
+  assert.match(app, /clientInput\.addEventListener\('focusout', deferCustomerFocusDismissal\)/);
+  assert.match(app, /inlineSuggestions\.addEventListener\('focusout', deferCustomerFocusDismissal\)/);
+  assert.match(css, /\.inline-client-suggestion[\s\S]*min-height:\s*44px/);
+  assert.match(css, /\.inline-client-suggestions[\s\S]*flex-wrap:\s*wrap/);
+});
+
+test('login admin tiene frontera de formulario y conserva current-password', () => {
+  const adminForm = html.match(/<form id="adminLogin"[^>]*>[\s\S]*?<\/form>/)?.[0] || '';
+  assert.ok(adminForm);
+  assert.match(adminForm, /id="adminPasswordInput"[^>]*type="password"[^>]*autocomplete="current-password"/);
+  const submitTag = adminForm.match(/<button[^>]*id="adminLoginBtn"[^>]*>/)?.[0] || '';
+  assert.ok(submitTag.includes('type="submit"'));
+  assert.doesNotMatch(html, /new-password|password-manager|readonly/);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /adminLogin'\)\.addEventListener\('submit'[\s\S]*event\.preventDefault\(\)/);
+});
+
+test('selector de tema aplica claro, noche y e-ink sin mezclar restricciones', () => {
+  assert.match(html, /<label class="theme-control" for="themeSelect"><span>Tema<\/span>/);
+  for (const value of ['light', 'dark', 'eink']) assert.ok(html.includes(`value="${value}"`));
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /applyTheme\(S\.loadTheme\(\)\)/);
+  assert.match(app, /document\.documentElement\.dataset\.theme = selectedTheme/);
+  assert.match(app, /classList\.toggle\('eink-mode', selectedTheme === 'eink'\)/);
+  assert.match(app, /meta\[name="theme-color"\]/);
+  assert.match(app, /S\.saveTheme\(event\.currentTarget\.value\)/);
   assert.match(app, /contains\('eink-mode'\)\) return/);
+  assert.match(css, /:root\[data-theme="dark"\]/);
+  assert.match(css, /\.theme-control select[^}]*min-height:\s*44px/);
   assert.match(css, /\.eink-mode, \.eink-mode body/);
   assert.match(css, /\.eink-mode[\s\S]*border:\s*2px solid #000/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
-  assert.match(css, /\.btn\.btn-small\.eink-toggle[\s\S]*min-height:\s*44px/);
 });

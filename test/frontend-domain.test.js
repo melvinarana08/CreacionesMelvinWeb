@@ -146,7 +146,7 @@ test('formatUnitPriceSummary muestra cantidad antes de talla y precio unitario',
   );
 });
 
-test('formatShareTicket genera ticket sincronizado con cliente y cantidad antes de talla', () => {
+test('formatShareTicket genera ticket sincronizado con producto antes de cantidad y talla', () => {
   const text = D.formatShareTicket({
     folio: 42,
     savedAt: '29/8/2026, 10:00:00',
@@ -162,9 +162,9 @@ test('formatShareTicket genera ticket sincronizado con cliente y cantidad antes 
   assert.match(text, /Creaciones Melvin/);
   assert.match(text, /Folio: 42/);
   assert.match(text, /Cliente: María/);
-  assert.match(text, /Cantidad # Talla/);
-  assert.match(text, /5 # 4 · Camisa escolar/);
-  assert.match(text, /1 # XL · Chaleco/);
+  assert.match(text, /Producto · Cantidad # Talla/);
+  assert.match(text, /Camisa escolar · 5 # 4/);
+  assert.match(text, /Chaleco · 1 # XL/);
   assert.match(text, /Unitario \$6\.00 · Importe \$30\.00/);
   assert.match(text, /Subtotal: \$42\.25/);
   assert.match(text, /Descuento: -\$2\.25/);
@@ -182,10 +182,23 @@ test('formatShareTicket identifica recibo pendiente y omite cliente y descuento 
     totalCents: 3000,
   });
   assert.match(text, /Estado: Pendiente de sincronizar/);
-  assert.match(text, /2 # A medida · Pantalón/);
+  assert.match(text, /Pantalón · 2 # A medida/);
   assert.doesNotMatch(text, /Folio:/);
   assert.doesNotMatch(text, /Cliente:/);
   assert.doesNotMatch(text, /Descuento:/);
+});
+
+test('formatShareTicket conserva un producto largo antes de cantidad y talla', () => {
+  const product = 'Camisa escolar manga larga edición especial sin abreviaturas';
+  const text = D.formatShareTicket({
+    folio: 7,
+    lines: [{ product, size: 5, quantity: 4, unitPriceCents: 600 }],
+    subtotalCents: 2400,
+    discountCents: 0,
+    totalCents: 2400,
+  });
+  assert.ok(text.includes(`${product} · 4 # 5`));
+  assert.ok(text.indexOf(product) < text.indexOf('4 # 5'));
 });
 
 test('priceRowsFromCatalog filtra por producto o devuelve todos sin mutar', () => {

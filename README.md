@@ -22,18 +22,22 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   sin tabla horizontal). Incluye cantidades exactas de un toque **1, 3, 5 y 12**, conserva
   los controles −/+ para ajuste fino entre 1 y 99, y elegir la talla no cambia la cantidad.
 - Precios **inmutables durante la venta**: cada línea guarda snapshot de nombre/talla/precio.
-- **Cliente (opcional):** campo semántico de nombre con ayudas para teclado/autocompletado
-  móvil y selector propio de clientes guardados. Al elegir uno, el diálogo se cierra, el
-  foco vuelve al campo y un estado accesible anuncia el nombre. Si queda vacío o contiene
-  solo espacios, la app pide confirmación antes de finalizar; cancelar conserva la venta.
+- **Cliente (opcional):** campo de texto libre con teclado móvil, sugerencias inline de
+  hasta ocho nombres recientes y un directorio completo separado. Las sugerencias filtran
+  por subcadena al escribir; al elegir una, el foco vuelve al campo y un estado accesible
+  anuncia el nombre. `autocomplete="off"` y un nombre específico de venta reducen falsos
+  avisos de credenciales en Chrome, pero sus heurísticas no se pueden controlar por completo.
+  Si queda vacío o contiene solo espacios, la app pide confirmación antes de finalizar.
 - Descuento manual: no negativo y ≤ subtotal.
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
   La app genera localmente un **PNG determinista** desde los datos de la venta (no captura
   el DOM), lo prepara antes del toque y lo comparte con texto por la hoja nativa solo si
   `navigator.canShare({ files })` acepta archivos. Si no hay soporte o falla sin cancelación,
   descarga el PNG y copia el texto; sin portapapeles, lo presenta para copia manual. Una
-  cancelación `AbortError` no descarga ni copia nada. No se suben tickets a terceros ni se
-  elige destinatario automáticamente; el folio real reemplaza al estado pendiente al sincronizar.
+  cancelación `AbortError` no descarga ni copia nada. Las líneas del PNG y del respaldo en
+  texto muestran primero el producto y después cantidad/talla (`Camisa · 4 # 5`) sin perder
+  nombres largos. No se suben tickets a terceros ni se elige destinatario automáticamente;
+  el folio real reemplaza al estado pendiente al sincronizar.
 - Cada línea muestra de forma explícita **cantidad, talla, precio unitario y total de línea**
   en el carrito, el comprobante, el detalle administrativo y el ticket térmico. El
   comprobante y la impresión usan la clave **Cantidad # Talla**: `5 # 4` significa cinco
@@ -51,9 +55,11 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   válido se conserva en el dispositivo, se muestra el comprobante y luego se sincroniza.
   UUID idempotente con fallback para HTTP LAN: reenviar la misma venta no la duplica.
 - Indicador en línea/sin conexión + contador de pendientes + botón de sincronización.
-- **Modo e-ink** visible y persistido en el dispositivo: presentación blanco/negro, bordes
-  sólidos, estados seleccionados que no dependen del color y movimiento desactivado. La
-  interfaz también honra `prefers-reduced-motion` y `forced-colors`.
+- Selector persistido de **Tema** con **Claro**, **Noche** y **E-ink**. Noche ofrece una
+  presentación oscura coloreada y legible; E-ink conserva blanco/negro, bordes sólidos,
+  estados no dependientes del color, sin movimiento ni vibración. La preferencia e-ink
+  anterior se migra automáticamente y la interfaz sigue honrando `prefers-reduced-motion`
+  y `forced-colors` de forma independiente.
 - Reimpresión no admin: el botón **Reimprimir venta** lista un número acotado de ventas
   recientes guardadas en IndexedDB en ese celular/tablet; si ya sincronizaron, imprime el
   snapshot del servidor con su folio real y, si siguen pendientes, imprime la copia local

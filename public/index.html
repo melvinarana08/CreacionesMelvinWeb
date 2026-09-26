@@ -23,7 +23,13 @@
       <span class="dot" id="connDot" aria-hidden="true"></span>
       <span id="connText" role="status">Conectando…</span>
       <span class="pending-badge" id="pendingBadge" hidden></span>
-      <button type="button" id="einkModeBtn" class="btn btn-small eink-toggle" aria-pressed="false">Modo e-ink: desactivado</button>
+      <label class="theme-control" for="themeSelect"><span>Tema</span>
+        <select id="themeSelect" aria-label="Tema visual">
+          <option value="light">Claro</option>
+          <option value="dark">Noche</option>
+          <option value="eink">E-ink</option>
+        </select>
+      </label>
       <button type="button" id="syncBtn" class="btn btn-small">Sincronizar</button>
     </div>
   </header>
@@ -80,8 +86,9 @@
             <label for="clientInput">Cliente (opcional)</label>
             <button type="button" id="pickClientBtn" class="btn btn-small btn-pick-client" title="Buscar en la lista de clientes">Elegir cliente guardado</button>
           </div>
-          <input id="clientInput" name="customer-name" type="text" maxlength="100" placeholder="Nombre del cliente" autocomplete="name" inputmode="text" autocapitalize="words" enterkeyhint="done" aria-describedby="clientHelp clientSelectionStatus">
-          <p id="clientHelp" class="field-help">Podés escribir un nombre nuevo o elegir uno guardado.</p>
+          <input id="clientInput" name="sale-customer-display-name" type="text" maxlength="100" placeholder="Nombre del cliente" autocomplete="off" inputmode="text" autocapitalize="words" enterkeyhint="done" aria-describedby="clientHelp clientSelectionStatus" aria-controls="inlineClientSuggestions" aria-expanded="false">
+          <div id="inlineClientSuggestions" class="inline-client-suggestions" aria-label="Clientes guardados recientes" hidden></div>
+          <p id="clientHelp" class="field-help">Opcional: escribí un nombre nuevo, elegí una sugerencia reciente o abrí el directorio completo.</p>
           <p id="clientSelectionStatus" class="selection-status" role="status" aria-live="polite" hidden></p>
         </div>
         <div id="encargoNotesRow" class="meta-row" hidden>
@@ -157,22 +164,22 @@
 
   <!-- ============ ADMINISTRACIÓN ============ -->
   <section id="adminView" class="card" aria-label="Administración" hidden>
-    <div id="adminLogin">
+    <form id="adminLogin" autocomplete="on">
       <h2>Administración</h2>
       <p class="muted">Acceso restringido. Ingresa la contraseña de administrador.</p>
       <div class="meta-row">
         <label for="adminPasswordInput">Contraseña</label>
         <div class="input-with-action">
-          <input id="adminPasswordInput" type="password" autocomplete="current-password">
+          <input id="adminPasswordInput" name="admin-password" type="password" autocomplete="current-password">
           <button type="button" id="togglePasswordBtn" class="btn-icon" aria-label="Mostrar u ocultar contraseña">👁️</button>
         </div>
       </div>
       <p id="adminLoginError" class="error-text" role="alert" hidden></p>
       <div class="dialog-actions">
         <button type="button" id="adminBackBtn" class="btn">Volver a ventas</button>
-        <button type="button" id="adminLoginBtn" class="btn btn-primary">Entrar</button>
+        <button type="submit" id="adminLoginBtn" class="btn btn-primary">Entrar</button>
       </div>
-    </div>
+    </form>
 
     <div id="adminPanel" hidden>
       <div class="section-title">

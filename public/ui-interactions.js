@@ -32,12 +32,47 @@ export function updateQuantityControls({ value, valueNode, minusButton, plusButt
   return quantity;
 }
 
-/** Aplica una selección del directorio, cierra, devuelve foco y anuncia el resultado. */
-export function applySelectedCustomer({ name, input, dialog, status }) {
+export const INLINE_CUSTOMER_LIMIT = 8;
+
+/** Filtra el directorio conservando su orden de uso reciente y limita la lista inline. */
+export function filterCustomerSuggestions(customers, query = '', limit = INLINE_CUSTOMER_LIMIT) {
+  if (!Array.isArray(customers)) return [];
+  const normalizedQuery = String(query).trim().toLocaleLowerCase('es');
+  const max = Number.isInteger(limit) && limit > 0 ? Math.min(limit, INLINE_CUSTOMER_LIMIT) : INLINE_CUSTOMER_LIMIT;
+  const seen = new Set();
+  const matches = [];
+  for (const value of customers) {
+    if (typeof value !== 'string') continue;
+    const clean = value.trim();
+    const key = clean.toLocaleLowerCase('es');
+    if (!clean || seen.has(key) || (normalizedQuery && !key.includes(normalizedQuery))) continue;
+    seen.add(key);
+    matches.push(clean);
+    if (matches.length === max) break;
+  }
+  return matches;
+}
+
+export function shouldShowCustomerSuggestions({ engaged, matches }) {
+  return Boolean(engaged && Array.isArray(matches) && matches.length > 0);
+}
+
+/** Decide los cierres sin depender de temporización del navegador. */
+export function shouldDismissCustomerSuggestions({ type, key, target, relatedTarget, input, suggestions }) {
+  if (type === 'keydown') return key === 'Escape';
+  const node = type === 'focusout' ? relatedTarget : target;
+  if (node === input) return false;
+  if (suggestions?.contains?.(node)) return false;
+  return type === 'pointerdown' || type === 'focusout';
+}
+
+/** Aplica una selección, oculta selectores, devuelve foco y anuncia el resultado. */
+export function applySelectedCustomer({ name, input, dialog, suggestions, status }) {
   const clean = typeof name === 'string' ? name.trim() : '';
   if (!clean) return false;
   input.value = clean;
   dialog?.close?.();
+  if (suggestions) suggestions.hidden = true;
   input.focus?.();
   if (status) {
     status.hidden = false;
