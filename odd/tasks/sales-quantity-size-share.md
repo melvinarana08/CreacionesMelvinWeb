@@ -64,14 +64,15 @@ Align the point-of-sale flow and ticket presentation with the operator's real wo
   - Bump and align the frontend service-worker cache version.
   - Run focused tests, full tests, and syntax checks.
   - Check: all authorized commands pass, or failures are recorded accurately.
-- [ ] **QSF-6 — Documentation and work-unit commit**
+- [x] **QSF-6 — Documentation and work-unit commit**
   - Align README, changelog, and design decisions with the implemented quantity-first, anonymous-sale confirmation, and digital sharing behavior.
   - Re-run the full automated checks and scan the staged candidate for secrets or production data.
   - Commit the complete verified working-tree release unit with a Conventional Commit message, excluding local indexes and runtime data.
-- [ ] **QSF-7 — Backup, deploy, and live verification**
+- [x] **QSF-7 — Backup, deploy, and live verification**
   - Create and verify a production database backup before replacing application files.
   - Deploy the committed source snapshot to gym-node-02 without replacing `.env`, `data/`, backups, or rollback assets.
-  - Rebuild the container and verify health, cache v18, the share control, and container health.
+  - Rebuild the container and verify health, cache v18, the share control, every imported static module, and container health.
+  - If live verification exposes a deterministic defect, add a focused regression test and hotfix before declaring deployment complete.
   - Record exact deployment and rollback evidence.
 
 ## Acceptance criteria
@@ -97,7 +98,18 @@ Align the point-of-sale flow and ticket presentation with the operator's real wo
 - Final independent verification completed with no actionable findings: interaction 6/6, domain 27/27, printer 19/19, UI contract 22/22, full suite 146/146, and `npm run check` passed.
 - Parent structural readback confirmed the helper wiring, pre-persistence customer guard, share status handling, and 32-column wrapping across thermal paths.
 - Parent spot-check reran `node --test test/ui-interactions.test.js` (6/6) and `git diff --check` completed without errors; only existing line-ending warnings were reported.
-- No commit, deployment, dependency installation, or cleanup of unrelated dirty-worktree changes occurred.
+- Release documentation was aligned in README, changelog, and design decisions; the documentation writer reran the full 146-test suite and syntax checks successfully.
+- Staged-path and secret-pattern scans passed; runtime data, `.env`, backups, and local indexes were excluded.
+- Commit `813de1268b174cdc6f77df4e81d06d553d53eb2b` (`feat(pos): improve sales and ticket workflow`) captured the verified accumulated release candidate; the branch is one commit ahead of `origin/main`.
+- Independent committed-range verification found one low-severity changelog contradiction; commit `088d921bae53d59fcb663d855ae9918fb627687a` corrected it, and reverification passed 146/146 tests plus syntax and diff checks with no remaining findings.
+- Production backup `sales-2026-09-26T03-05-12-310Z.db` was created with 66 sales and its SHA-256 verified successfully.
+- The verified archive was extracted and the production container rebuilt healthy with cache v18 and the share control present.
+- Initial live module verification found `/ui-interactions.js` returned HTTP 404 because the server static-file allowlist omitted the new imported module. No rollback was executed.
+- Strict-TDD hotfix evidence: the new real-server test first failed with `404 !== 200`, then passed after the minimal allowlist entry; full verification passed 147/147 tests and syntax checks.
+- Commit `f173204592116a03665e98921371aee866cf20eb` (`fix(server): serve UI interaction module`) was independently verified with no security or regression findings.
+- Hotfix archive SHA-256 `7f6e96c0a03087f814bca81b95f1efa545540373c08d020472740b74932f2abc` was deployed to gym-node-02 and the container rebuilt successfully.
+- Final live checks passed: health endpoint OK, cache `cm-sales-v18`, share control present, `/ui-interactions.js` served as JavaScript with `performShare`, `app.js` imports the module, and all 66 production sales remained present.
+- `.env`, persistent sales data, the verified backup, and rollback assets were preserved. No rollback was required.
 
 ## Next step
-Align delivery documentation, create the authorized work-unit commit, then back up and deploy the exact committed snapshot to gym-node-02. Device-only smoke checks remain user-owned after deployment.
+User-owned device smoke checks: physical 58 mm printing/reprinting, Bluetooth reconnect, mobile focus/screen reader behavior, Web Share/WhatsApp destination availability, clipboard permissions, and installed PWA cache activation.
