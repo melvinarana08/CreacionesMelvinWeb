@@ -91,8 +91,12 @@ Make the POS PWA more intuitive by offering explicit light, night, and e-ink the
 - The two documentation corrections were independently reverified with no remaining findings; documentation `git diff --check` passed.
 - Parent structural readback confirmed theme migration/rollback, product-first PNG layout, theme application, inline customer touch/focus flow, and e-ink haptic suppression. Parent reran `npm test` successfully at 174/174 and `git diff --check` without errors.
 - Native review could not create a lineage because intended-untracked selection returned schema-incompatible; the completed independent verifier and parent checks remain the review evidence.
-- Work-unit commit: `a093fcf` (`feat(pos): add themes and inline customer suggestions`).
-- User explicitly authorized commit, push, and production deployment after final verification; deployment must preserve `.env` and persistent sales data and create a backup first.
+- Work-unit commit: `a093fcf` (`feat(pos): add themes and inline customer suggestions`); delivery-evidence commit: `eef713e`.
+- Pushed `main` through `eef713e` to `origin/main`.
+- Pre-deployment source backup: `/home/operator1/backups/creaciones-melvin-source-before-eef713e-20260926-130623.tar.gz`.
+- Verified SQLite backup: `/home/operator1/backups/sales-2026-09-26T19-06-24-425Z.db` with matching SHA-256 and 69 sales.
+- Deployed from `/home/operator1/releases/creaciones-melvin-eef713e-20260926-1307` using the preserved production `.env` and named volume `creaciones-melvin_sales-data`.
+- Live verification passed: container healthy, `/api/health` OK, 69 sales preserved, HTML exposes the theme selector and inline customers, service worker serves cache v20 with changed shell assets, dark/amber styles are present, and PNG/plain-text sharing code is product-first.
 
 ## Next step
-Push the committed release, back up production, deploy cache v20, verify live health/static delivery and preserved sales, then hand off real-device/browser checks to the user.
+User-owned real-device/browser checks: theme appearance and selector fit, Chrome credential heuristics, touch/focus customer behavior, forced-colors/reduced-motion, installed-PWA v19→v20 activation, shared PNG/text appearance, and physical thermal output.
