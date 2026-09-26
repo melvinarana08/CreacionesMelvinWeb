@@ -88,7 +88,11 @@ Make the POS PWA more intuitive by offering explicit light, night, and e-ink the
 - Corrected writer verification passed: storage 12/12, UI contract 26/26, full suite 174/174, `npm run check`, and scoped `git diff --check`.
 - Final independent verification confirmed all runtime acceptance areas and every authorized command: storage 12/12, receipt image 7/7, interactions 14/14, domain 28/28, UI contract 26/26, full suite 174/174, `npm run check`, and scoped `git diff --check`.
 - Its only remaining findings were this unchecked MTP-6 progress marker and ambiguous migration wording in `docs/DECISIONS.md`; both documentation issues were corrected without changing runtime code.
+- The two documentation corrections were independently reverified with no remaining findings; documentation `git diff --check` passed.
+- Parent structural readback confirmed theme migration/rollback, product-first PNG layout, theme application, inline customer touch/focus flow, and e-ink haptic suppression. Parent reran `npm test` successfully at 174/174 and `git diff --check` without errors.
+- Native review could not create a lineage because intended-untracked selection returned schema-incompatible; the completed independent verifier and parent checks remain the review evidence.
+- Work-unit commit: `a093fcf` (`feat(pos): add themes and inline customer suggestions`).
 - User explicitly authorized commit, push, and production deployment after final verification; deployment must preserve `.env` and persistent sales data and create a backup first.
 
 ## Next step
-Reverify the two documentation corrections, perform parent spot checks, commit, push, back up production, deploy v20, and verify live health/static delivery.
+Push the committed release, back up production, deploy cache v20, verify live health/static delivery and preserved sales, then hand off real-device/browser checks to the user.
