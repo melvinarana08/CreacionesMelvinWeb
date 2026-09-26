@@ -11,6 +11,9 @@ const LS_DEVICE_ID = 'cm_device_id';
 const LS_SELLER_TOKEN = 'cm_seller_token';
 const LS_CART = 'cm_cart';
 const LS_CATALOG = 'cm_catalog';
+const LS_PRINT_SUCCESSES = 'cm_print_successes';
+
+export const RECENT_LOCAL_SALES_LIMIT = 20;
 
 export function createUuid(cryptoImpl = globalThis.crypto, random = Math.random) {
   // crypto.randomUUID disponible en contextos seguros (https/localhost)
@@ -103,6 +106,24 @@ export function listPendingSales() {
   return readAllSales();
 }
 
+function saleRecordTimestamp(record) {
+  return record?.serverResponse?.serverTs
+    || record?.syncedAt
+    || record?.payload?.clientTs
+    || record?.savedAt
+    || '';
+}
+
+/** Devuelve ventas locales recientes desde la cola IndexedDB del dispositivo. */
+export async function listRecentLocalSales(limit = RECENT_LOCAL_SALES_LIMIT) {
+  const max = Number.isInteger(limit) && limit > 0 ? Math.min(limit, RECENT_LOCAL_SALES_LIMIT) : RECENT_LOCAL_SALES_LIMIT;
+  const rows = await readAllSales();
+  return rows
+    .filter((record) => record && record.payload)
+    .sort((a, b) => saleRecordTimestamp(b).localeCompare(saleRecordTimestamp(a)))
+    .slice(0, max);
+}
+
 export async function countPending() {
   const rows = await readAllSales();
   return rows.filter((record) => record.status === 'pending').length;
@@ -167,6 +188,40 @@ export function loadCart() {
 
 export function clearCart() {
   localStorage.removeItem(LS_CART);
+}
+
+function loadPrintSuccesses() {
+  try {
+    const raw = localStorage.getItem(LS_PRINT_SUCCESSES);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function cleanPrintKey(key) {
+  return typeof key === 'string' && key.trim().length > 0 && key.length <= 160 ? key.trim() : null;
+}
+
+export function getPrintSuccessAt(key) {
+  const clean = cleanPrintKey(key);
+  if (!clean) return null;
+  const value = loadPrintSuccesses()[clean];
+  return typeof value === 'string' && value ? value : null;
+}
+
+export function hasPrintSuccess(key) {
+  return getPrintSuccessAt(key) !== null;
+}
+
+export function markPrintSuccess(key, timestamp = new Date().toISOString()) {
+  const clean = cleanPrintKey(key);
+  if (!clean) return false;
+  const successes = loadPrintSuccesses();
+  successes[clean] = timestamp;
+  localStorage.setItem(LS_PRINT_SUCCESSES, JSON.stringify(successes));
+  return true;
 }
 
 const LS_CLIENTS = 'cm_clients';

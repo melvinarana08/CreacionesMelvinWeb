@@ -2,6 +2,18 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 17. Compartir tickets mediante capacidades del sistema (2026-09-25)
+
+- **Decisión:** compartir un comprobante es una acción iniciada por el usuario y usa Web
+  Share para abrir la hoja nativa del sistema, donde WhatsApp puede aparecer como destino
+  si está instalado; no se incorpora una dependencia específica de WhatsApp. Cuando Web
+  Share no está disponible o falla sin una cancelación explícita, el texto se copia al
+  portapapeles para que el usuario lo pegue; sin esa API, se presenta para copia manual.
+- **Identidad y privacidad:** un ticket pendiente se identifica como pendiente y nunca
+  inventa un folio; tras sincronizarse incluye el folio real. La app no elige destinatarios,
+  no envía el comprobante en segundo plano y no agrega un servicio ni endpoint de difusión:
+  el usuario controla el destino y confirma el envío fuera de la app.
+
 ## 15. Navegación: salir de administración regresa a la venta (2026-08-28)
 
 - **Decisión:** el botón **Salir** del panel admin cierra la sesión y regresa a la vista de

@@ -22,3 +22,6 @@ Thumbs.db
 # Editor
 .idea/
 .vscode/
+# Local Pi runtime state
+.atl/
+.codegraph/

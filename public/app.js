@@ -7,6 +7,7 @@ import * as D from './domain.js';
 import * as S from './storage.js';
 import * as Api from './api.js';
 import * as Printer from './printer.js';
+import { performShare, updateSizeChipSelection } from './ui-interactions.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -29,6 +30,8 @@ const state = {
   encargoMode: false,
   activeEncargoId: null,
   encargosSubtab: 'summary',
+  printingKeys: new Set(),
+  finalizingSale: false,
 };
 
 // ---------------- Utilidades de render (siempre textContent) ----------------
@@ -141,12 +144,15 @@ function renderCatalog() {
 }
 
 function openPicker(product, keepSelection = false) {
+  const productChanged = state.selectedCategory !== product.name;
   state.selectedCategory = product.name;
-  if (!keepSelection || !product.sizes.some((s) => s.size === state.selectedSize)) {
-    state.selectedSize = product.sizes[0].size;
+  if (!keepSelection || productChanged) {
+    state.selectedSize = null;
+    state.qty = 1;
+  } else if (!product.sizes.some((s) => s.size === state.selectedSize)) {
+    state.selectedSize = null;
   }
-  state.qty = 1;
-  $('pickerTitle').textContent = `${product.name} — elige talla`;
+  $('pickerTitle').textContent = `${product.name} — cantidad y talla`;
   const chips = $('sizeChips');
   chips.replaceChildren();
   for (const s of product.sizes) {
@@ -155,12 +161,13 @@ function openPicker(product, keepSelection = false) {
     chip.setAttribute('aria-pressed', String(s.size === state.selectedSize));
     chip.addEventListener('click', () => {
       state.selectedSize = s.size;
-      state.qty = 1;
-      renderCatalog();
+      updateSizeChipSelection(chips.children, chip);
+      $('addLineBtn').disabled = false;
     });
     chips.append(chip);
   }
   $('qtyValue').textContent = String(state.qty);
+  $('addLineBtn').disabled = state.selectedSize === null;
   $('sizePicker').hidden = false;
 }
 
@@ -284,11 +291,11 @@ async function syncAll() {
 
 // ---------------- Flujo de venta ----------------
 
-function finalizeSale() {
-  const clientVal = $('clientInput').value;
+async function finalizeSale() {
+  if (state.finalizingSale) return;
   const built = D.buildSalePayload({
     cart: state.cart,
-    clientName: clientVal,
+    clientName: $('clientInput').value,
     discountCents: state.discountCents,
     deviceId: S.getDeviceId(),
     id: S.createUuid(),
@@ -297,54 +304,100 @@ function finalizeSale() {
     showError('cartError', built.reason);
     return;
   }
-  // 1) Guardar local PRIMERO (offline-first). Solo si se guarda se limpia el carrito.
-  S.savePendingSale(built.payload)
-    .then(() => {
-      // Recordar cliente local y en servidor
-      if (built.payload.clientName) {
-        S.rememberClient(built.payload.clientName);
-        if (state.online) Api.postClient(built.payload.clientName).catch(() => {});
-        loadClientsList();
-      }
 
-      // Si correspondía a un encargo en entrega, marcarlo como entregado
-      if (state.activeEncargoId) {
-        const encargoId = state.activeEncargoId;
-        state.activeEncargoId = null;
-        exitEncargoMode();
-        const sellerToken = S.hasSellerToken() ? S.getSellerToken() : null;
-        Api.deliverEncargo(encargoId, built.payload.id, sellerToken)
-          .then(() => loadEncargos())
-          .catch((err) => console.error('Error al marcar encargo entregado:', err));
-      }
+  state.finalizingSale = true;
+  const finishButton = $('finishBtn');
+  finishButton.disabled = true;
+  finishButton.setAttribute('aria-busy', 'true');
+  try {
+    if (built.payload.clientName === null && !window.confirm(
+      'No agregaste el nombre del cliente. ¿Deseas finalizar la venta sin nombre? Pulsa Cancelar para volver y agregarlo.'
+    )) return;
 
-      state.receipt = {
-        id: built.payload.id,
-        lines: built.payload.lines.map((l) => ({ ...l })),
-        subtotalCents: D.computeSubtotal(built.payload.lines),
-        discountCents: built.payload.discountCents,
-        totalCents: D.computeTotal(D.computeSubtotal(built.payload.lines), built.payload.discountCents),
-        clientName: built.payload.clientName,
-        folio: null,
-        savedAt: new Date().toLocaleString('es'),
-      };
-      state.cart = [];
-      state.discountCents = 0;
-      $('clientInput').value = '';
-      $('encargoNotesInput').value = '';
-      S.clearCart();
-      renderCart();
-      showReceipt();
-      refreshPendingCount();
-      syncAll(); // intento inmediato; si falla, queda en cola
-    })
-    .catch((e) => {
-      console.error('Fallo al guardar localmente:', e);
-      showError('cartError', 'No se pudo guardar la venta en este dispositivo. Intenta de nuevo.');
-    });
+    // Guardar local PRIMERO (offline-first). Solo si se guarda se limpia el carrito.
+    await S.savePendingSale(built.payload);
+
+    if (built.payload.clientName) {
+      S.rememberClient(built.payload.clientName);
+      if (state.online) Api.postClient(built.payload.clientName).catch(() => {});
+      loadClientsList();
+    }
+
+    // Si correspondía a un encargo en entrega, marcarlo como entregado.
+    if (state.activeEncargoId) {
+      const encargoId = state.activeEncargoId;
+      state.activeEncargoId = null;
+      exitEncargoMode();
+      const sellerToken = S.hasSellerToken() ? S.getSellerToken() : null;
+      Api.deliverEncargo(encargoId, built.payload.id, sellerToken)
+        .then(() => loadEncargos())
+        .catch((err) => console.error('Error al marcar encargo entregado:', err));
+    }
+
+    const subtotalCents = D.computeSubtotal(built.payload.lines);
+    state.receipt = {
+      id: built.payload.id,
+      lines: built.payload.lines.map((l) => ({ ...l })),
+      subtotalCents,
+      discountCents: built.payload.discountCents,
+      totalCents: D.computeTotal(subtotalCents, built.payload.discountCents),
+      clientName: built.payload.clientName,
+      folio: null,
+      savedAt: new Date().toLocaleString('es'),
+    };
+    state.cart = [];
+    state.discountCents = 0;
+    $('clientInput').value = '';
+    $('encargoNotesInput').value = '';
+    S.clearCart();
+    renderCart();
+    showReceipt();
+    refreshPendingCount();
+    syncAll(); // intento inmediato; si falla, queda en cola
+  } catch (e) {
+    console.error('Fallo al guardar localmente:', e);
+    showError('cartError', 'No se pudo guardar la venta en este dispositivo. Intenta de nuevo.');
+  } finally {
+    state.finalizingSale = false;
+    finishButton.removeAttribute('aria-busy');
+    const discountValid = D.validateDiscount(state.discountCents, D.computeSubtotal(state.cart));
+    finishButton.disabled = state.cart.length === 0 || !discountValid.ok;
+  }
 }
 
 // ---------------- Impresión térmica Bluetooth ----------------
+
+function printKey(kind, id) {
+  return id ? `${kind}:${id}` : null;
+}
+
+function duplicatePrintMessage() {
+  return 'Este ticket ya se imprimió correctamente en este dispositivo. Si continúas, saldrá otra copia. ¿Deseas imprimir otra copia?';
+}
+
+async function runPrintWithSafety({ key, button = null, status, print }) {
+  if (key && state.printingKeys.has(key)) return { ok: false, reason: 'Impresión en curso' };
+  if (key && S.hasPrintSuccess(key) && !window.confirm(duplicatePrintMessage())) {
+    status?.('Impresión cancelada. No se imprimió otra copia.', 'failure');
+    return { ok: false, canceled: true };
+  }
+  if (key) state.printingKeys.add(key);
+  if (button) {
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+  }
+  try {
+    const result = await print();
+    if (result.ok && key) S.markPrintSuccess(key);
+    return result;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+    if (key) state.printingKeys.delete(key);
+  }
+}
 
 function showPrintStatus(message, type = 'saving') {
   const node = $('printStatus');
@@ -353,9 +406,46 @@ function showPrintStatus(message, type = 'saving') {
   node.textContent = message || '';
 }
 
-async function printCurrentReceipt() {
+function showShareStatus(message, type = 'saving') {
+  const node = $('shareStatus');
+  node.hidden = !message;
+  node.className = `status-text ${type}`;
+  node.textContent = message || '';
+}
+
+async function shareCurrentReceipt() {
   if (!state.receipt) return;
-  showPrintStatus('Conectando con la impresora…', 'saving');
+  const text = D.formatShareTicket(state.receipt);
+  const title = state.receipt.folio
+    ? `Ticket Creaciones Melvin · Folio ${state.receipt.folio}`
+    : 'Ticket Creaciones Melvin · Pendiente de sincronizar';
+  showShareStatus(null);
+
+  const result = await performShare({
+    payload: { title, text },
+    share: typeof navigator.share === 'function' ? (payload) => navigator.share(payload) : null,
+    copy: navigator.clipboard && typeof navigator.clipboard.writeText === 'function'
+      ? (value) => navigator.clipboard.writeText(value)
+      : null,
+  });
+
+  if (result.status === 'shared') {
+    showShareStatus('Ticket compartido.', 'success');
+  } else if (result.status === 'cancelled') {
+    showShareStatus('Compartir cancelado.', 'saving');
+  } else if (result.status === 'copied') {
+    showShareStatus('Ticket copiado. Abrí WhatsApp y pegalo en la conversación.', 'success');
+  } else if (result.status === 'unavailable') {
+    window.prompt('Copiá este ticket y pegalo en WhatsApp:', text);
+    showShareStatus('Copiá el ticket mostrado y pegalo en WhatsApp.', 'saving');
+  } else {
+    showShareStatus('No se pudo compartir ni copiar el ticket. Intenta de nuevo.', 'failure');
+  }
+}
+
+async function printCurrentReceipt(event) {
+  if (!state.receipt) return;
+  showPrintStatus('Conectando con la impresora… Por favor espera.', 'saving');
   const r = state.receipt;
   const ticketData = {
     title: r.folio ? `Folio ${r.folio}` : 'Ticket',
@@ -373,11 +463,17 @@ async function printCurrentReceipt() {
     clientName: r.clientName,
     date: r.savedAt,
   };
-  const result = await Printer.printReceipt(ticketData);
+  const result = await runPrintWithSafety({
+    key: printKey('sale', r.id),
+    button: event?.currentTarget || $('printReceiptBtn'),
+    status: showPrintStatus,
+    print: () => Printer.printReceipt(ticketData),
+  });
+  if (result.canceled) return;
   if (result.ok) {
     showPrintStatus('✅ Ticket impreso correctamente.', 'success');
   } else {
-    showPrintStatus(`No se pudo imprimir: ${result.reason}`, 'failure');
+    showPrintStatus(`No se pudo imprimir. Revisa la impresora e intenta de nuevo. Detalle: ${result.reason}`, 'failure');
   }
 }
 
@@ -401,9 +497,10 @@ function renderReceipt() {
   body.replaceChildren();
   body.append(el('p', 'muted', `Fecha: ${r.savedAt}`));
   if (r.clientName) body.append(el('p', 'muted', `Cliente: ${r.clientName}`));
+  body.append(el('p', 'receipt-key', 'Cantidad # Talla'));
   for (const line of r.lines) {
     const row = el('div', 'receipt-line');
-    const desc = el('span', null, `${line.product} · ${D.formatUnitPriceSummary(line)}`);
+    const desc = el('span', null, `${line.product} · ${line.quantity} # ${line.size} · Unitario ${D.formatUSD(line.unitPriceCents)}`);
     const price = el('span', null, D.formatUSD(D.computeLineTotal(line.unitPriceCents, line.quantity)));
     row.append(desc, price);
     body.append(row);
@@ -420,6 +517,126 @@ function renderReceipt() {
   total.append(el('span', null, 'TOTAL'), el('span', null, D.formatUSD(r.totalCents)));
   body.append(total);
   body.append(el('p', 'muted', 'Gracias por su compra.'));
+}
+
+function localSaleDisplay(record) {
+  const serverSale = record.serverResponse;
+  const payload = record.payload;
+  const folio = serverSale?.folio ? `Folio ${serverSale.folio}` : 'Pendiente de sincronizar';
+  const rawDate = serverSale?.serverTs || record.syncedAt || payload?.clientTs || record.savedAt;
+  const date = rawDate ? new Date(rawDate).toLocaleString('es') : 'Fecha no disponible';
+  const client = serverSale?.clientName || payload?.clientName || '';
+  const subtotal = serverSale?.subtotalCents ?? D.computeSubtotal(payload?.lines || []);
+  const discount = serverSale?.discountCents ?? payload?.discountCents ?? 0;
+  const total = serverSale?.totalCents ?? D.computeTotal(subtotal, discount);
+  return { folio, date, client, total };
+}
+
+function localSaleTicketData(record) {
+  const serverSale = record.serverResponse;
+  if (serverSale?.items) {
+    return {
+      key: printKey('sale', serverSale.id || record.id),
+      ticketData: {
+        title: serverSale.folio ? `Folio ${serverSale.folio}` : 'Ticket',
+        lines: serverSale.items.map((it) => ({
+          product: it.productName,
+          size: it.size,
+          quantity: it.quantity,
+          unitPriceCents: it.unitPriceCents,
+          lineTotalCents: D.computeLineTotal(it.unitPriceCents, it.quantity),
+        })),
+        subtotalCents: serverSale.subtotalCents,
+        discountCents: serverSale.discountCents,
+        totalCents: serverSale.totalCents,
+        folio: serverSale.folio,
+        clientName: serverSale.clientName,
+        date: serverSale.serverTs ? new Date(serverSale.serverTs).toLocaleString('es') : undefined,
+      },
+    };
+  }
+
+  const payload = record.payload;
+  const subtotal = D.computeSubtotal(payload.lines || []);
+  const discount = payload.discountCents || 0;
+  return {
+    key: printKey('sale', payload.id || record.id),
+    ticketData: {
+      title: 'Ticket pendiente',
+      lines: (payload.lines || []).map((l) => ({
+        product: l.product,
+        size: l.size,
+        quantity: l.quantity,
+        unitPriceCents: l.unitPriceCents,
+        lineTotalCents: D.computeLineTotal(l.unitPriceCents, l.quantity),
+      })),
+      subtotalCents: subtotal,
+      discountCents: discount,
+      totalCents: D.computeTotal(subtotal, discount),
+      folio: null,
+      clientName: payload.clientName,
+      date: record.savedAt ? new Date(record.savedAt).toLocaleString('es') : undefined,
+    },
+  };
+}
+
+function showLocalSalesStatus(message, type = 'saving') {
+  const node = $('localSalesStatus');
+  node.hidden = !message;
+  node.className = `status-text ${type}`;
+  node.textContent = message || '';
+}
+
+async function printLocalSaleRecord(record, button) {
+  const { key, ticketData } = localSaleTicketData(record);
+  showLocalSalesStatus('Conectando con la impresora… Por favor espera.', 'saving');
+  const result = await runPrintWithSafety({
+    key,
+    button,
+    status: showLocalSalesStatus,
+    print: () => Printer.printReceipt(ticketData),
+  });
+  if (result.canceled) return;
+  if (result.ok) {
+    showLocalSalesStatus('✅ Copia impresa correctamente.', 'success');
+  } else {
+    showLocalSalesStatus(`No se pudo imprimir. Revisa la impresora e intenta de nuevo. Detalle: ${result.reason}`, 'failure');
+  }
+}
+
+function renderLocalSales(records) {
+  const list = $('localSalesList');
+  list.replaceChildren();
+  if (records.length === 0) {
+    list.append(el('p', 'muted', 'No hay ventas guardadas en este dispositivo todavía.'));
+    return;
+  }
+  for (const record of records) {
+    const info = localSaleDisplay(record);
+    const btn = el('button', 'local-sale-button');
+    btn.type = 'button';
+    btn.append(
+      el('span', 'local-sale-title', info.folio),
+      el('span', 'local-sale-meta', `${info.date}${info.client ? ` · ${info.client}` : ''}`),
+      el('span', 'local-sale-total', D.formatUSD(info.total))
+    );
+    btn.addEventListener('click', () => printLocalSaleRecord(record, btn));
+    list.append(btn);
+  }
+}
+
+async function openLocalSalesDialog() {
+  showLocalSalesStatus('Cargando ventas recientes de este dispositivo…', 'saving');
+  $('localSalesDialog').showModal();
+  try {
+    const records = await S.listRecentLocalSales();
+    renderLocalSales(records);
+    showLocalSalesStatus(null);
+  } catch (e) {
+    console.error('No se pudo leer el historial local:', e);
+    renderLocalSales([]);
+    showLocalSalesStatus('No se pudieron leer las ventas guardadas en este dispositivo.', 'failure');
+  }
 }
 
 // ---------------- Administración ----------------
@@ -595,9 +812,9 @@ function showSaleDetailStatus(message, type = 'saving') {
   node.textContent = message || '';
 }
 
-async function reprintFromDetail() {
+async function reprintFromDetail(event) {
   if (!saleDetailCache) return;
-  showSaleDetailStatus('Conectando con la impresora…', 'saving');
+  showSaleDetailStatus('Conectando con la impresora… Por favor espera.', 'saving');
   const s = saleDetailCache;
   const ticketData = {
     title: `Folio ${s.folio}`,
@@ -615,11 +832,17 @@ async function reprintFromDetail() {
     clientName: s.clientName,
     date: new Date(s.serverTs).toLocaleString('es'),
   };
-  const result = await Printer.printReceipt(ticketData);
+  const result = await runPrintWithSafety({
+    key: printKey('sale', s.id),
+    button: event?.currentTarget || $('saleDetailReprintBtn'),
+    status: showSaleDetailStatus,
+    print: () => Printer.printReceipt(ticketData),
+  });
+  if (result.canceled) return;
   if (result.ok) {
     showSaleDetailStatus('✅ Ticket reimpreso correctamente.', 'success');
   } else {
-    showSaleDetailStatus(`No se pudo imprimir: ${result.reason}`, 'failure');
+    showSaleDetailStatus(`No se pudo imprimir. Revisa la impresora e intenta de nuevo. Detalle: ${result.reason}`, 'failure');
   }
 }
 
@@ -1091,7 +1314,7 @@ function renderEncargosClients(encargos) {
     convertBtn.addEventListener('click', () => convertEncargoToSale(enc));
 
     const printBtn = el('button', 'btn btn-small', '🖨️ Ticket');
-    printBtn.addEventListener('click', () => printSingleEncargoTicket(enc));
+    printBtn.addEventListener('click', () => printSingleEncargoTicket(enc, printBtn));
 
     const cancelBtn = el('button', 'btn btn-small btn-danger-soft', '✕ Cancelar');
     cancelBtn.addEventListener('click', () => cancelEncargoAction(enc));
@@ -1127,12 +1350,17 @@ function convertEncargoToSale(encargo) {
   renderCart();
 }
 
-async function printSingleEncargoTicket(encargo) {
-  const res = await Printer.printSingleEncargo(encargo);
+async function printSingleEncargoTicket(encargo, button = null) {
+  const res = await runPrintWithSafety({
+    key: printKey('encargo', encargo.id),
+    button,
+    print: () => Printer.printSingleEncargo(encargo),
+  });
+  if (res.canceled) return;
   if (res.ok) {
     alert('✅ Ticket de encargo impreso correctamente.');
   } else {
-    alert(`No se pudo imprimir: ${res.reason}`);
+    alert(`No se pudo imprimir. Revisa la impresora e intenta de nuevo. Detalle: ${res.reason}`);
   }
 }
 
@@ -1159,7 +1387,7 @@ function renderEncargosDelivered(deliveredEncargos) {
   }
 
   for (const enc of deliveredEncargos) {
-    const card = el('div', 'encargo-card delivered-card');
+    const card = el('div', 'encargo-card delivered');
     const head = el('div', 'admin-item-head');
     head.append(
       el('strong', null, `👤 ${enc.clientName}`),
@@ -1183,21 +1411,27 @@ function renderEncargosDelivered(deliveredEncargos) {
   }
 }
 
-async function printEncargosSummaryTicketAction() {
+async function printEncargosSummaryTicketAction(event) {
   if (!state.encargos || state.encargos.length === 0) {
     alert('No hay encargos activos para imprimir.');
     return;
   }
   const summary = D.aggregateEncargosByProductAndSize(state.encargos);
-  const res = await Printer.printEncargosTicket({
-    encargos: state.encargos,
-    summary,
-    date: new Date().toLocaleDateString('es'),
+  const summaryKey = `workshop:${state.encargos.map((enc) => enc.id).sort().join(',')}`;
+  const res = await runPrintWithSafety({
+    key: summaryKey,
+    button: event?.currentTarget || $('printEncargosSummaryBtn'),
+    print: () => Printer.printEncargosTicket({
+      encargos: state.encargos,
+      summary,
+      date: new Date().toLocaleDateString('es'),
+    }),
   });
+  if (res.canceled) return;
   if (res.ok) {
     alert('✅ Ticket de taller impreso correctamente.');
   } else {
-    alert(`No se pudo imprimir: ${res.reason}`);
+    alert(`No se pudo imprimir. Revisa la impresora e intenta de nuevo. Detalle: ${res.reason}`);
   }
 }
 
@@ -1344,9 +1578,13 @@ async function init() {
   });
   $('finishBtn').addEventListener('click', finalizeSale);
   $('printReceiptBtn').addEventListener('click', printCurrentReceipt);
+  $('shareReceiptBtn').addEventListener('click', shareCurrentReceipt);
+  $('localReprintBtn').addEventListener('click', openLocalSalesDialog);
+  $('closeLocalSalesBtn').addEventListener('click', () => $('localSalesDialog').close());
   $('newSaleBtn').addEventListener('click', () => {
     state.receipt = null;
     showPrintStatus(null);
+    showShareStatus(null);
     $('receiptView').hidden = true;
     $('saleView').hidden = false;
     renderCart();
@@ -1488,7 +1726,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v15';
+  const swVersion = 'v18';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

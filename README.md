@@ -18,26 +18,45 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 
 ### Venta (terminal, sin login)
 - Catálogo inicial desde `productos.json` (incluye **Short**), editable por admin.
-- Selección por **producto → talla → cantidad** (interfaz de chips, sin tabla horizontal).
+- Flujo de selección **producto → cantidad → talla explícita → agregar** (interfaz de chips,
+  sin tabla horizontal). Elegir la talla conserva la cantidad seleccionada.
 - Precios **inmutables durante la venta**: cada línea guarda snapshot de nombre/talla/precio.
-- Cliente opcional: un solo campo (nombre o teléfono).
+- Cliente opcional: un solo campo (nombre o teléfono). Si queda vacío o contiene solo
+  espacios, la app pide confirmación antes de finalizar; cancelar conserva la venta actual.
 - Descuento manual: no negativo y ≤ subtotal.
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
-- Cada línea muestra de forma explícita **cantidad, precio unitario y total de línea** en el
-  carrito, el comprobante, el detalle administrativo y el ticket térmico.
+  Desde el comprobante terminado se puede compartir el ticket mediante la hoja nativa del
+  sistema (incluido WhatsApp cuando está disponible como destino). Sin Web Share, o ante
+  un error no causado por cancelación, se copia el texto al portapapeles para pegarlo
+  manualmente; si el navegador no ofrece portapapeles, presenta el texto para copia manual.
+- Cada línea muestra de forma explícita **cantidad, talla, precio unitario y total de línea**
+  en el carrito, el comprobante, el detalle administrativo y el ticket térmico. El
+  comprobante y la impresión usan la clave **Cantidad # Talla**: `5 # 4` significa cinco
+  prendas de talla 4.
 - El producto activo queda resaltado; las tallas se muestran con números de menor a mayor
   antes de las tallas de letras, y **Consultar precios** usa un control visual diferenciado.
-- En el ticket térmico, las tallas de letras se imprimen con separación (`T M`) para evitar
-  confundir el prefijo de talla con su valor.
+- Impresión térmica Bluetooth ESC/POS (58 mm) desde Chrome/Edge Android: comprobante de
+  venta, reimpresión administrativa y reimpresión local de ventas recientes guardadas en
+  el mismo dispositivo.
+- Los tickets térmicos mantienen el ancho de 32 columnas y envuelven nombres largos sin
+  perder texto en ventas, resúmenes de taller, detalles por cliente y encargos individuales.
 - Las líneas del carrito, la venta guardada y el comprobante se agrupan automáticamente
   por categoría/producto, aunque se hayan seleccionado intercaladas con otras categorías.
 - **Offline-first:** la venta se guarda primero en IndexedDB (cola local), el último catálogo
   válido se conserva en el dispositivo, se muestra el comprobante y luego se sincroniza.
   UUID idempotente con fallback para HTTP LAN: reenviar la misma venta no la duplica.
 - Indicador en línea/sin conexión + contador de pendientes + botón de sincronización.
+- Reimpresión no admin: el botón **Reimprimir venta** lista un número acotado de ventas
+  recientes guardadas en IndexedDB en ese celular/tablet; si ya sincronizaron, imprime el
+  snapshot del servidor con su folio real y, si siguen pendientes, imprime la copia local
+  sin inventar un folio.
+- Seguridad contra duplicados: la primera impresión no pregunta; después de una impresión
+  exitosa, el mismo ticket pide confirmación clara antes de sacar otra copia. Las impresiones
+  fallidas no quedan marcadas como impresas.
 
 ### Administración (protegida con contraseña)
-- Listar ventas (activas/anuladas/todas).
+- Listar ventas (activas/anuladas/todas) y abrir su detalle para reimprimir el ticket
+  sincronizado por Bluetooth; esta reimpresión requiere sesión administrativa.
 - **Anular** ventas con motivo obligatorio (nunca editar/eliminar una venta finalizada).
 - **Editar catálogo** con UI estructurada (tarjetas por producto y fila por talla):
   actualizar precios y agregar productos nuevos desde el panel.
@@ -202,7 +221,6 @@ CHANGELOG.md        Historial de cambios
 
 ## Próxima implementación prevista
 
-- Impresión del comprobante de la venta en una **impresora térmica Bluetooth de 53 mm u
-  80 mm**. Se diseñará como integración propia de este proyecto, con plantilla adaptable
-  al ancho y reimpresión controlada; **no corresponde a la Epson TM de Gym OS** ni crea
-  una dependencia con ese proyecto independiente.
+- Evaluar si hace falta búsqueda cross-device por folio. La opción actual prioriza privacidad
+  y simplicidad operativa: reimpresión local por ventas recientes del mismo dispositivo, sin
+  exponer un listado público de ventas.

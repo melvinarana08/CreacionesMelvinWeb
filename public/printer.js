@@ -84,20 +84,64 @@ export function formatTwoCols(left, right, cols = COLS) {
 }
 
 /**
- * Formatea una línea de producto del ticket:
- * "Producto (Talla) x3" + segunda línea con "$unitario c/u    $total".
+ * Formatea la talla para tickets impresos con espacio legible después del prefijo T.
+ * @param {number|string} size
+ * @returns {string}
+ */
+function formatSizeLabel(size) {
+  return `T ${size}`;
+}
+
+/** Divide texto en líneas completas, respetando palabras y partiendo tokens mayores al ancho. */
+function wrapText(text, width = COLS) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+
+  for (const originalWord of words) {
+    let word = originalWord;
+    while (word.length > width) {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      lines.push(word.slice(0, width));
+      word = word.slice(width);
+    }
+    if (!word) continue;
+    if (!current) {
+      current = word;
+    } else if (current.length + 1 + word.length <= width) {
+      current += ` ${word}`;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function formatWrappedProduct(name, firstPrefix = '', continuationPrefix = firstPrefix) {
+  const width = COLS - Math.max(firstPrefix.length, continuationPrefix.length);
+  return wrapText(name, width)
+    .map((line, index) => `${index === 0 ? firstPrefix : continuationPrefix}${line}`)
+    .join('\n');
+}
+
+/**
+ * Formatea una línea de producto con el nombre separado de la clave cantidad/talla.
  * @param {{product:string, size:(number|string), quantity:number, unitPriceCents:number, lineTotalCents:number}} line
  * @returns {string}
  */
 export function formatItemLine(line) {
   if (!line || typeof line.product !== 'string' || line.product.trim() === '') return '';
   if (line.size == null || line.quantity == null || line.lineTotalCents == null) return '';
-  const sizePrefix = typeof line.size === 'string' ? 'T ' : 'T';
-  const desc = `${line.product} (${sizePrefix}${line.size}) x${line.quantity}`;
+  const metadata = `${line.quantity} # ${line.size}`;
   const unit = `$${centsToText(line.unitPriceCents)} c/u`;
   const total = `$${centsToText(line.lineTotalCents)}`;
   const space = Math.max(1, COLS - unit.length - total.length);
-  return `${desc}\n${unit}${' '.repeat(space)}${total}`;
+  return `${wrapText(line.product).join('\n')}\n${metadata}\n${unit}${' '.repeat(space)}${total}`;
 }
 
 /**
@@ -147,6 +191,8 @@ export function buildTicketBytes(receipt) {
   push(encodeText('-'.repeat(COLS)));
   push([LF]);
   push(encodeText(formatTwoCols('DESCRIPCION', 'TOTAL')));
+  push([LF]);
+  push(encodeText('CANT. # TALLA'));
   push([LF]);
   push(encodeText('-'.repeat(COLS)));
   push([LF]);
@@ -245,11 +291,11 @@ export function buildEncargosTicketBytes({ encargos = [], summary, date = '' }) 
   if (summary && Array.isArray(summary.products) && summary.products.length > 0) {
     for (const prod of summary.products) {
       push(BOLD_ON);
-      push(encodeText(`[ ] ${prod.name}`));
+      push(encodeText(formatWrappedProduct(prod.name, '[ ] ', '    ')));
       push([LF]);
       push(BOLD_OFF);
       for (const s of prod.sizes) {
-        const sizeLabel = typeof s.size === 'string' ? `T ${s.size}` : `Talla ${s.size}`;
+        const sizeLabel = formatSizeLabel(s.size);
         push(encodeText(formatTwoCols(`    ${sizeLabel}`, `x ${s.quantity}`)));
         push([LF]);
       }
@@ -296,8 +342,10 @@ export function buildEncargosTicketBytes({ encargos = [], summary, date = '' }) 
 
     if (Array.isArray(enc.items)) {
       for (const it of enc.items) {
-        const sizeLabel = typeof it.size === 'string' ? `T ${it.size}` : `T${it.size}`;
-        push(encodeText(formatTwoCols(`    ${it.productName} (${sizeLabel})`, `x${it.quantity}`)));
+        const sizeLabel = formatSizeLabel(it.size);
+        push(encodeText(formatWrappedProduct(it.productName, '    ', '    ')));
+        push([LF]);
+        push(encodeText(formatTwoCols(`    ${sizeLabel}`, `x${it.quantity}`)));
         push([LF]);
       }
     }
@@ -369,13 +417,15 @@ export function buildSingleEncargoTicketBytes(encargo) {
   if (Array.isArray(encargo.items)) {
     for (const it of encargo.items) {
       totalQty += it.quantity || 0;
-      const sizeLabel = typeof it.size === 'string' ? 'T ' : 'T';
-      const desc = `${it.productName} (${sizeLabel}${it.size}) x${it.quantity}`;
       const lineTotalCents = (it.unitPriceCents || 0) * (it.quantity || 0);
       const unit = `$${centsToText(it.unitPriceCents || 0)} c/u`;
       const tot = `$${centsToText(lineTotalCents)}`;
       const space = Math.max(1, COLS - unit.length - tot.length);
-      push(encodeText(`${desc}\n${unit}${' '.repeat(space)}${tot}`));
+      push(encodeText(formatWrappedProduct(it.productName)));
+      push([LF]);
+      push(encodeText(`${formatSizeLabel(it.size)} x${it.quantity}`));
+      push([LF]);
+      push(encodeText(`${unit}${' '.repeat(space)}${tot}`));
       push([LF]);
     }
   }

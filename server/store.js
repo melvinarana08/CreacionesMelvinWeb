@@ -160,10 +160,22 @@ function insertSaleTx(db, sale) {
  * existente sin crear nada nuevo.
  */
 export function createSale(db, input, catalog) {
-  const sale = validateSaleInput(input, catalog);
+  const id = typeof input?.id === 'string' ? input.id.trim() : '';
+  if (UUID_RE.test(id)) {
+    const existing = getSale(db, id);
+    if (existing) {
+      const discountCents = input.discountCents;
+      if (!Number.isInteger(discountCents) || discountCents < 0) {
+        throw new HttpError(400, 'invalid_discount', 'El descuento debe ser un entero no negativo');
+      }
+      if (discountCents > existing.subtotalCents) {
+        throw new HttpError(400, 'discount_exceeds_subtotal', 'El descuento no puede ser mayor al subtotal');
+      }
+      return existing;
+    }
+  }
 
-  const existing = getSale(db, sale.id);
-  if (existing) return existing;
+  const sale = validateSaleInput(input, catalog);
 
   db.exec('BEGIN');
   try {

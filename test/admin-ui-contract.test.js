@@ -83,6 +83,37 @@ test('admin: diálogo de detalle con reimprimir y botones Ver/Anular', () => {
   assert.match(app, /saleDetailCache/, 'debe cachear la venta para reimprimir');
 });
 
+test('ventas: reimpresión local muestra historial del dispositivo y límite explícito', () => {
+  for (const id of ['localReprintBtn', 'localSalesDialog', 'localSalesList', 'localSalesStatus', 'closeLocalSalesBtn']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
+  }
+  assert.match(html, /solo muestra ventas guardadas en este celular o tablet/i);
+  assert.match(html, /Pendiente de sincronizar/i);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /listRecentLocalSales/);
+  assert.match(app, /serverResponse/);
+  assert.match(app, /runPrintWithSafety/);
+  assert.match(css, /\.local-sale-button/);
+});
+
+test('impresión duplicada requiere confirmación después de un éxito y bloquea botones', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /hasPrintSuccess/);
+  assert.match(app, /markPrintSuccess/);
+  assert.match(app, /otra copia/i);
+  assert.match(app, /button\.disabled = true/);
+  assert.match(app, /button\.disabled = false/);
+  assert.match(app, /aria-busy/);
+  assert.doesNotMatch(app, /button\.textContent = 'Imprimiendo…'/);
+});
+
+test('historial de encargos entregados usa clase que coincide con CSS existente', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /encargo-card delivered/);
+  assert.doesNotMatch(app, /delivered-card/);
+  assert.match(css, /\.encargo-card\.delivered/);
+});
+
 test('el footer muestra la versión de la app y la caché del SW', () => {
   assert.ok(html.includes('id="appVersion"'), 'falta el span de versión en el footer');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
@@ -100,11 +131,56 @@ test('barra móvil flotante y layout responsivo de tablet están presentes', () 
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app.js están alineados en caché v15', () => {
+test('service worker y app.js están alineados en caché v18 e incluyen interacciones', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v15/);
-  assert.match(app, /swVersion = 'v15'/);
+  assert.match(sw, /cm-sales-v18/);
+  assert.match(sw, /'\/ui-interactions\.js'/);
+  assert.match(app, /swVersion = 'v18'/);
+  assert.match(app, /from '\.\/ui-interactions\.js'/);
+});
+
+test('selector de venta presenta cantidad antes de talla y exige talla explícita', () => {
+  const quantityAt = html.indexOf('id="quantityStepLabel"');
+  const sizeAt = html.indexOf('id="sizeStepLabel"');
+  const addAt = html.indexOf('id="addLineBtn"');
+  assert.ok(quantityAt >= 0 && quantityAt < sizeAt && sizeAt < addAt);
+  assert.match(html, /id="addLineBtn"[^>]*disabled/);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /state\.selectedSize = null/);
+  assert.doesNotMatch(app, /state\.selectedSize = product\.sizes\[0\]\.size/);
+  assert.doesNotMatch(app, /state\.selectedSize = s\.size;\s*state\.qty = 1/);
+  assert.match(app, /addLineBtn'\)\.disabled = state\.selectedSize === null/);
+  const chipHandler = app.match(/chip\.addEventListener\('click', \(\) => \{([\s\S]*?)\n    \}\);/)?.[1] || '';
+  assert.match(chipHandler, /updateSizeChipSelection\(chips\.children, chip\)/);
+  assert.doesNotMatch(chipHandler, /replaceChildren|openPicker|renderCatalog/);
+});
+
+test('finalizar venta confirma cliente vacío antes de guardar y bloquea duplicados', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  const finalizeStart = app.indexOf('async function finalizeSale()');
+  const finalizeEnd = app.indexOf('// ---------------- Impresión térmica', finalizeStart);
+  const finalize = app.slice(finalizeStart, finalizeEnd);
+  assert.ok(finalize.indexOf('window.confirm') < finalize.indexOf('S.savePendingSale'));
+  assert.match(finalize, /built\.payload\.clientName === null/);
+  assert.match(finalize, /volver y agregarlo/i);
+  assert.match(finalize, /if \(state\.finalizingSale\) return/);
+  assert.match(finalize, /aria-busy/);
+  assert.match(finalize, /finally/);
+});
+
+test('comprobante permite compartir por Web Share o copiar para WhatsApp', () => {
+  for (const id of ['shareReceiptBtn', 'shareStatus']) {
+    assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
+  }
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /D\.formatShareTicket\(state\.receipt\)/);
+  assert.match(app, /performShare\(\{/);
+  assert.match(app, /navigator\.share\(payload\)/);
+  assert.match(app, /navigator\.clipboard\.writeText\(value\)/);
+  assert.match(app, /result\.status === 'cancelled'/);
+  assert.match(app, /result\.status === 'copied'/);
+  assert.match(app, /WhatsApp/);
 });
 
 test('barra flotante móvil previene solapamiento con botón finalizar venta', () => {

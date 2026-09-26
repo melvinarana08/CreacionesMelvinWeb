@@ -37,12 +37,16 @@
       <div id="categoryList" class="category-list" role="group" aria-label="Categorías"></div>
       <div id="sizePicker" class="size-picker" hidden>
         <p class="picker-title" id="pickerTitle"></p>
-        <div id="sizeChips" class="size-chips" role="group" aria-label="Tallas"></div>
-        <div class="qty-row">
+        <p class="picker-step" id="quantityStepLabel">1. Elegí la cantidad</p>
+        <div class="qty-row" role="group" aria-labelledby="quantityStepLabel">
           <button type="button" id="qtyMinus" class="btn qty-btn" aria-label="Quitar uno">−</button>
-          <span id="qtyValue" class="qty-value">1</span>
+          <span id="qtyValue" class="qty-value" aria-live="polite">1</span>
           <button type="button" id="qtyPlus" class="btn qty-btn" aria-label="Agregar uno">+</button>
-          <button type="button" id="addLineBtn" class="btn btn-primary">Agregar</button>
+        </div>
+        <p class="picker-step" id="sizeStepLabel">2. Elegí la talla</p>
+        <div id="sizeChips" class="size-chips" role="group" aria-labelledby="sizeStepLabel"></div>
+        <div class="picker-add-row">
+          <button type="button" id="addLineBtn" class="btn btn-primary" disabled>Agregar</button>
         </div>
       </div>
     </section>
@@ -50,7 +54,10 @@
     <section id="cartSection" class="card" aria-label="Carrito">
       <div class="section-title">
         <h2 id="cartTitle">Venta actual</h2>
-        <button type="button" id="cancelEncargoModeBtn" class="btn btn-small btn-danger-soft" hidden>Cancelar encargo</button>
+        <div class="cart-title-actions">
+          <button type="button" id="localReprintBtn" class="btn btn-small btn-reprint">🖨️ Reimprimir venta</button>
+          <button type="button" id="cancelEncargoModeBtn" class="btn btn-small btn-danger-soft" hidden>Cancelar encargo</button>
+        </div>
       </div>
       <p id="cartEmpty" class="muted">El carrito está vacío.</p>
       <ul id="cartList" class="cart-list"></ul>
@@ -132,8 +139,10 @@
     <p class="receipt-status" id="receiptStatus" role="status"></p>
     <div id="receiptBody" class="receipt-body"></div>
     <p id="printStatus" class="status-text" role="status" hidden></p>
+    <p id="shareStatus" class="status-text" role="status" aria-live="polite" hidden></p>
     <div class="receipt-actions">
       <button type="button" id="printReceiptBtn" class="btn">🖨️ Imprimir ticket</button>
+      <button type="button" id="shareReceiptBtn" class="btn">Compartir ticket</button>
       <button type="button" id="newSaleBtn" class="btn btn-primary">Nueva venta</button>
     </div>
   </section>
@@ -201,6 +210,19 @@
       </div>
     </div>
   </section>
+
+  <dialog id="localSalesDialog" class="product-dialog" aria-labelledby="localSalesDialogTitle">
+    <div class="dialog-content">
+      <h2 id="localSalesDialogTitle">Reimprimir venta de este dispositivo</h2>
+      <p class="muted">Esta lista solo muestra ventas guardadas en este celular o tablet. Si la venta se hizo en otro dispositivo, no aparecerá aquí.</p>
+      <p class="muted">Se muestran las ventas recientes. Las ventas con folio usan la copia confirmada por el servidor; las ventas marcadas como "Pendiente de sincronizar" imprimen la copia local guardada.</p>
+      <div id="localSalesList" class="local-sales-list"></div>
+      <p id="localSalesStatus" class="status-text" role="status" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" id="closeLocalSalesBtn" class="btn">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="clientPickerDialog" class="product-dialog" aria-labelledby="clientPickerTitle">
     <div class="dialog-content">

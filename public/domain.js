@@ -140,9 +140,33 @@ export function formatUSD(cents) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-/** Texto visible para explicar cantidad y precio unitario sin confundirlo con el total de línea. */
+/** Texto visible para explicar cantidad, talla y precio unitario sin confundirlo con el total de línea. */
 export function formatUnitPriceSummary(line) {
-  return `Talla ${line.size} · Cantidad ${line.quantity} · Unitario ${formatUSD(line.unitPriceCents)}`;
+  return `Cantidad ${line.quantity} · Talla ${line.size} · Unitario ${formatUSD(line.unitPriceCents)}`;
+}
+
+/** Construye el texto plano de un comprobante para compartirlo sin depender del DOM. */
+export function formatShareTicket(receipt) {
+  if (!receipt || !Array.isArray(receipt.lines)) return '';
+  const rows = [
+    'Creaciones Melvin',
+    'COMPROBANTE DE VENTA',
+    receipt.folio != null ? `Folio: ${receipt.folio}` : 'Estado: Pendiente de sincronizar',
+  ];
+  if (receipt.savedAt) rows.push(`Fecha: ${receipt.savedAt}`);
+  if (receipt.clientName) rows.push(`Cliente: ${receipt.clientName}`);
+  rows.push('', 'Cantidad # Talla');
+  for (const line of receipt.lines) {
+    const lineTotal = computeLineTotal(line.unitPriceCents, line.quantity);
+    rows.push(
+      `${line.quantity} # ${line.size} · ${line.product}`,
+      `Unitario ${formatUSD(line.unitPriceCents)} · Importe ${formatUSD(lineTotal)}`
+    );
+  }
+  rows.push('', `Subtotal: ${formatUSD(receipt.subtotalCents)}`);
+  if (receipt.discountCents > 0) rows.push(`Descuento: -${formatUSD(receipt.discountCents)}`);
+  rows.push(`Total: ${formatUSD(receipt.totalCents)}`);
+  return rows.join('\n');
 }
 
 /**

@@ -5,6 +5,12 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Flujo de venta cantidad primero**: la selección sigue producto → cantidad → talla explícita → agregar, y elegir una talla conserva la cantidad indicada.
+- **Confirmación de venta anónima**: finalizar con el cliente vacío o compuesto solo por espacios exige confirmación; cancelar conserva el carrito y no guarda ni sincroniza la venta.
+- **Compartir ticket digital**: el comprobante terminado abre la hoja nativa de Web Share (con WhatsApp como posible destino del sistema) y, si no está disponible o falla sin cancelación del usuario, copia el texto para compartirlo manualmente; sin API de portapapeles, lo presenta para copia manual. Los tickets pendientes se identifican como tales y los sincronizados usan su folio real.
+- **Módulo `public/ui-interactions.js`**: concentra y permite probar las interacciones de selección de talla y el flujo Web Share/portapapeles.
+- **Reimpresión local para vendedores sin admin**: botón *Reimprimir venta* en ventas, con diálogo de ventas recientes guardadas en el dispositivo. Imprime el snapshot del servidor cuando existe y la copia local cuando aún está pendiente de sincronizar.
+- **Seguridad contra duplicados de impresión**: después de una impresión exitosa, el mismo ticket pide confirmación antes de imprimir otra copia; los controles se bloquean mientras la impresión está en curso.
 - **Módulo de Encargos (Pedidos a futuro) y Gestión de Taller**:
   - **Navegación principal de cabecera**: selector rápido entre *🛒 Ventas* y *📦 Encargos* con insignia numérica de pedidos pendientes.
   - **Toma de pedidos ágil**: botón *"📦 Guardar como Encargo"* integrado directamente en el carrito móvil de venta para registrar prendas y tallas sin duplicar pantallas.
@@ -46,7 +52,15 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - **Diálogo de detalle de venta en administración**: botón "Ver" en cada venta abre un diálogo con el detalle completo (folio, fecha, cliente, líneas, totales) y un botón "🖨️ Reimprimir" que reimprime el ticket por Bluetooth. Las ventas anuladas muestran el motivo pero no permiten anular de nuevo.
 - **Web Bluetooth requiere HTTPS**: `isWebBluetoothAvailable` verifica `window.isSecureContext` y el mensaje de error guía a la URL HTTPS de Tailscale Serve (`gym-node-02.tail4a98b6.ts.net`), que es el secure context necesario.
 
+### Cambiado
+- **Notación cantidad antes de talla**: el comprobante en pantalla, el texto compartido y el ticket térmico usan la clave `Cantidad # Talla` y líneas como `5 # 4`.
+- **Formato térmico sin pérdida**: los nombres largos se envuelven dentro de las 32 columnas en tickets de venta, resúmenes de taller, detalles por cliente y encargos individuales.
+- **Caché PWA `cm-sales-v18`**: conserva la línea base acumulada hasta v16, incluye el nuevo módulo de interacciones y distribuye el flujo actualizado a los dispositivos.
+
 ### Corregido
+- `createSale` devuelve una venta existente por UUID antes de revalidar precios contra el catálogo vigente, para que un replay idempotente siga funcionando tras cambios de precio.
+- El historial de encargos entregados usa la clase `.encargo-card.delivered`, alineada con el CSS existente.
+- La documentación ya no presenta la impresión térmica Bluetooth como pendiente; ahora describe la implementación actual.
 - El producto seleccionado ahora queda resaltado y anuncia su estado con `aria-pressed`.
 - Dentro de cada producto, las tallas numéricas se ordenan de menor a mayor y aparecen antes
   que las tallas de letras, sin mutar el carrito original.

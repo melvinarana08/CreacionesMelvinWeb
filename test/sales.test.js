@@ -153,6 +153,21 @@ test('createSale es idempotente por UUID: misma venta, mismo folio, sin duplicad
   db.close();
 });
 
+test('createSale replay de UUID existente gana a validación de precio de catálogo', () => {
+  const db = freshDb();
+  const original = createSale(db, validInput(), catalog());
+  replaceCatalog(db, [
+    ...catalog().filter((p) => p.name !== 'Short'),
+    { name: 'Short', sizes: [{ size: 10, priceCents: 900 }] },
+  ]);
+  const replay = createSale(db, validInput(), getCatalog(db));
+  assert.equal(replay.id, original.id);
+  assert.equal(replay.folio, original.folio);
+  assert.equal(replay.items[0].unitPriceCents, 650);
+  assert.equal(listSales(db).length, 1);
+  db.close();
+});
+
 test('folios son secuenciales por servidor', () => {
   const db = freshDb();
   const s1 = createSale(db, validInput({ id: '123e4567-e89b-12d3-a456-426614174001' }), catalog());

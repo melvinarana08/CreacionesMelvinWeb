@@ -37,3 +37,18 @@ test('loadCatalog devuelve null si no hay caché o está dañada', () => {
   localStorage.setItem('cm_catalog', JSON.stringify({ no: 'array' }));
   assert.equal(S.loadCatalog(), null);
 });
+
+test('seguimiento de impresión exitosa se guarda por clave estable', () => {
+  assert.equal(S.hasPrintSuccess('sale:abc'), false);
+  assert.equal(S.getPrintSuccessAt('sale:abc'), null);
+  assert.equal(S.markPrintSuccess('sale:abc', '2026-08-24T12:00:00.000Z'), true);
+  assert.equal(S.hasPrintSuccess('sale:abc'), true);
+  assert.equal(S.getPrintSuccessAt('sale:abc'), '2026-08-24T12:00:00.000Z');
+});
+
+test('seguimiento de impresión ignora claves inválidas y localStorage dañado', () => {
+  localStorage.setItem('cm_print_successes', '{mal json');
+  assert.equal(S.hasPrintSuccess('sale:abc'), false);
+  assert.equal(S.markPrintSuccess('', '2026-08-24T12:00:00.000Z'), false);
+  assert.equal(S.getPrintSuccessAt(''), null);
+});

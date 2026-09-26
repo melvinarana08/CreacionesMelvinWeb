@@ -111,6 +111,13 @@ main, section.card { max-width: 640px; margin: 0 auto; }
 }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.cart-title-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+.btn-reprint {
+  border: 2px solid var(--teal);
+  background: #ecfdf5;
+  color: var(--teal-dark);
+  font-weight: 700;
+}
 
 .category-list { display: flex; flex-wrap: wrap; gap: .5rem; }
 .category-list .btn { flex: 1 1 auto; min-width: 120px; }
@@ -179,12 +186,14 @@ main, section.card { max-width: 640px; margin: 0 auto; }
   background: #f1f5f9;
 }
 .picker-title { margin: 0 0 .5rem; font-weight: 600; }
+.picker-step { margin: .65rem 0 .35rem; color: var(--muted); font-size: .9rem; font-weight: 700; }
 .size-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .75rem; }
 .size-chips .btn { min-width: 52px; min-height: 44px; text-align: center; font-weight: 600; }
 .size-chips .btn.selected { background: var(--teal); border-color: var(--teal); color: #fff; }
 .qty-row { display: flex; align-items: center; gap: .6rem; }
 .qty-value { font-size: 1.25rem; font-weight: 700; min-width: 2.2ch; text-align: center; }
-.qty-row .btn-primary { margin-left: auto; min-height: 48px; min-width: 96px; font-weight: 700; }
+.picker-add-row { display: flex; justify-content: flex-end; }
+.picker-add-row .btn-primary { min-height: 48px; min-width: 112px; font-weight: 700; }
 
 .cart-list { list-style: none; margin: .5rem 0; padding: 0; display: grid; gap: .5rem; }
 .cart-item {
@@ -238,11 +247,12 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 
 .receipt-body { border: 1px dashed var(--border); border-radius: var(--radius); padding: .75rem; margin: .75rem 0; }
 .receipt-status { font-weight: 600; }
+.receipt-key { margin: .5rem 0 .2rem; color: var(--muted); font-size: .8rem; font-weight: 700; text-transform: uppercase; }
 .receipt-line { display: flex; justify-content: space-between; gap: .5rem; font-size: .9rem; padding: .15rem 0; }
 .receipt-total { font-weight: 800; font-size: 1.1rem; border-top: 1px solid var(--border); margin-top: .5rem; padding-top: .5rem; }
 
-.receipt-actions { display: flex; gap: .6rem; margin-top: .75rem; }
-.receipt-actions .btn { flex: 1; padding: .7rem; font-size: .95rem; border-radius: var(--radius); }
+.receipt-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+.receipt-actions .btn { flex: 1 1 140px; min-height: 48px; padding: .7rem; font-size: .95rem; border-radius: var(--radius); }
 
 .tabs { display: flex; gap: .3rem; margin: .75rem 0; }
 .tab {
@@ -351,6 +361,23 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .custom-size-row label { grid-column: 1 / -1; color: var(--muted); font-size: .85rem; }
 .custom-size-row input { width: 100%; text-align: left; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.local-sales-list { display: grid; gap: .6rem; margin-top: .75rem; }
+.local-sale-button {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: .75rem;
+  display: grid;
+  gap: .25rem;
+  text-align: left;
+  cursor: pointer;
+}
+.local-sale-button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.local-sale-button[disabled] { opacity: .6; cursor: not-allowed; }
+.local-sale-title { font-weight: 800; font-size: 1rem; color: var(--text); }
+.local-sale-meta { color: var(--muted); font-size: .9rem; }
+.local-sale-total { font-weight: 800; color: var(--teal-dark); }
 
 .app-footer {
   position: fixed;

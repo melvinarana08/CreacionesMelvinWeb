@@ -2,9 +2,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 const records = [
-  { id: '1', status: 'pending' },
-  { id: '2', status: 'synced' },
-  { id: '3', status: 'pending' },
+  { id: '1', status: 'pending', savedAt: '2026-08-24T10:00:00.000Z', payload: { id: '1' } },
+  { id: '2', status: 'synced', savedAt: '2026-08-24T11:00:00.000Z', payload: { id: '2' }, serverResponse: { serverTs: '2026-08-24T13:00:00.000Z' } },
+  { id: '3', status: 'pending', savedAt: '2026-08-24T12:00:00.000Z', payload: { id: '3' } },
 ];
 
 function asyncIndexedDbFake(rows) {
@@ -60,4 +60,9 @@ test('listPendingSales espera a que getAll termine antes de leer result', async 
 
 test('countPending espera la lectura IndexedDB y cuenta solo pendientes', async () => {
   assert.equal(await S.countPending(), 2);
+});
+
+test('listRecentLocalSales ordena por fecha disponible y limita resultados', async () => {
+  const rows = await S.listRecentLocalSales(2);
+  assert.deepEqual(rows.map((r) => r.id), ['2', '3']);
 });

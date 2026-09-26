@@ -135,15 +135,57 @@ test('formatUSD del frontend coincide con el del servidor', () => {
   assert.equal(D.formatUSD(0), '$0.00');
 });
 
-test('formatUnitPriceSummary muestra talla, cantidad y precio unitario explícito', () => {
+test('formatUnitPriceSummary muestra cantidad antes de talla y precio unitario', () => {
   assert.equal(
     D.formatUnitPriceSummary({ size: 10, quantity: 2, unitPriceCents: 600 }),
-    'Talla 10 · Cantidad 2 · Unitario $6.00'
+    'Cantidad 2 · Talla 10 · Unitario $6.00'
   );
   assert.equal(
     D.formatUnitPriceSummary({ size: 'XL', quantity: 1, unitPriceCents: 1225 }),
-    'Talla XL · Cantidad 1 · Unitario $12.25'
+    'Cantidad 1 · Talla XL · Unitario $12.25'
   );
+});
+
+test('formatShareTicket genera ticket sincronizado con cliente y cantidad antes de talla', () => {
+  const text = D.formatShareTicket({
+    folio: 42,
+    savedAt: '29/8/2026, 10:00:00',
+    clientName: 'María',
+    lines: [
+      { product: 'Camisa escolar', size: 4, quantity: 5, unitPriceCents: 600 },
+      { product: 'Chaleco', size: 'XL', quantity: 1, unitPriceCents: 1225 },
+    ],
+    subtotalCents: 4225,
+    discountCents: 225,
+    totalCents: 4000,
+  });
+  assert.match(text, /Creaciones Melvin/);
+  assert.match(text, /Folio: 42/);
+  assert.match(text, /Cliente: María/);
+  assert.match(text, /Cantidad # Talla/);
+  assert.match(text, /5 # 4 · Camisa escolar/);
+  assert.match(text, /1 # XL · Chaleco/);
+  assert.match(text, /Unitario \$6\.00 · Importe \$30\.00/);
+  assert.match(text, /Subtotal: \$42\.25/);
+  assert.match(text, /Descuento: -\$2\.25/);
+  assert.match(text, /Total: \$40\.00/);
+});
+
+test('formatShareTicket identifica recibo pendiente y omite cliente y descuento vacíos', () => {
+  const text = D.formatShareTicket({
+    folio: null,
+    savedAt: '29/8/2026, 10:00:00',
+    clientName: null,
+    lines: [{ product: 'Pantalón', size: 'A medida', quantity: 2, unitPriceCents: 1500 }],
+    subtotalCents: 3000,
+    discountCents: 0,
+    totalCents: 3000,
+  });
+  assert.match(text, /Estado: Pendiente de sincronizar/);
+  assert.match(text, /2 # A medida · Pantalón/);
+  assert.doesNotMatch(text, /Folio:/);
+  assert.doesNotMatch(text, /Cliente:/);
+  assert.doesNotMatch(text, /Descuento:/);
 });
 
 test('priceRowsFromCatalog filtra por producto o devuelve todos sin mutar', () => {
