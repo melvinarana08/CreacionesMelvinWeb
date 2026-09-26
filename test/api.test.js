@@ -90,6 +90,18 @@ async function adminGet(base, cookie, p) {
   return jsonFetch(base, p, { cookie });
 }
 
+test('sirve el módulo de interacciones de UI', async (t) => {
+  const { base, close } = await startServer();
+  t.after(close);
+
+  const response = await fetch(`${base}/ui-interactions.js`);
+  const source = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /^text\/javascript(?:;|$)/);
+  assert.match(source, /export async function performShare\b/);
+});
+
 test('integración HTTP: flujo completo venta + admin', async (t) => {
   const ctx = await startServer();
   const { base, close } = ctx;
