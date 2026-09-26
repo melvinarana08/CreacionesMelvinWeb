@@ -91,9 +91,13 @@ Make ticket sharing preserve its visual structure, make customer entry unmistaka
 - Parent structural readback confirmed the deterministic PNG model, file-share/cancellation/download state machine, customer semantics, and exact quantity controls.
 - Parent spot-check reran `node --test test/receipt-image.test.js` (7/7) and `git diff --check` completed without errors; only non-failing line-ending warnings were reported.
 - Final automated evidence remains: focused suites 7/7, 11/11, 7/7, 24/24, and 8/8; full suite 163/163; `npm run check` passed.
-- Work-unit commit: `5e902d4` (`feat(pos): add PNG ticket sharing and e-ink UX`).
+- Work-unit commit: `5e902d4` (`feat(pos): add PNG ticket sharing and e-ink UX`); delivery-evidence commit: `fb33346`.
 - Native review could not create a lineage because the provider rejected intended-untracked selection as schema-incompatible; the completed independent verifier and parent checks remain the review evidence.
+- Pushed `main` through `fb33346` to `origin/main`.
+- Deployed the `fb33346` release package to gym-node-02 from `/home/operator1/releases/creaciones-melvin-fb33346-20260926-0927`; preserved the existing `.env` and named SQLite volume.
+- Pre-deployment source backup: `/home/operator1/backups/creaciones-melvin-before-fb33346-20260926-092726.tar.gz`.
+- Production verification passed: container healthy, `/api/health` OK, `receipt-image.js` served, service worker exposes `cm-sales-v19` and precaches the image module, HTML contains e-ink and quantity controls, and the persistent database reports 67 sales.
 - No dependency installation occurred.
 
 ## Next step
-Push the committed work, deploy it to gym-node-02, verify production health/static v19 delivery, then run user-owned device smoke checks: Android/iOS file sharing and WhatsApp destination behavior, clipboard-denial/download fallback, 768–1024 px portrait and short-landscape layouts, and physical e-ink refresh/readability.
+Run user-owned device smoke checks: Android/iOS file sharing and WhatsApp destination behavior, clipboard-denial/download fallback, 768–1024 px portrait and short-landscape layouts, and physical e-ink refresh/readability.
