@@ -5,6 +5,11 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ## [Unreleased]
 
 ### Añadido
+- **Ticket visual PNG sin dependencias**: el comprobante se compone de forma determinista desde el modelo de venta y se dibuja con Canvas 2D en blanco y negro, con texto Unicode, nombres largos, tallas personalizadas, cantidades hasta 99, alto dinámico y límites de tamaño/DPR.
+- **Compartir imagen primero con respaldo privado**: el PNG se prepara antes del toque y solo se entrega a Web Share cuando `navigator.canShare({ files })` lo admite. Sin soporte o ante un fallo no cancelado, se descarga la imagen y se copia el texto; sin portapapeles se ofrece copia manual. `AbortError` no dispara descarga, copia ni diálogo.
+- **Cantidades rápidas exactas 1, 3, 5 y 12**: selección de un toque, además de −/+ y el límite existente de 1–99; elegir talla no modifica la cantidad.
+- **Modo e-ink persistido**: control visible con blanco/negro, bordes sólidos, estados no dependientes del color y movimiento desactivado; también se respetan reducción de movimiento y colores forzados del sistema.
+- **Cliente opcional optimizado para móvil**: semántica de nombre, ayuda breve, búsqueda separada de clientes guardados, objetivos táctiles de 44 px, retorno de foco y anuncio accesible de la selección.
 - **Flujo de venta cantidad primero**: la selección sigue producto → cantidad → talla explícita → agregar, y elegir una talla conserva la cantidad indicada.
 - **Confirmación de venta anónima**: finalizar con el cliente vacío o compuesto solo por espacios exige confirmación; cancelar conserva el carrito y no guarda ni sincroniza la venta.
 - **Compartir ticket digital**: el comprobante terminado abre la hoja nativa de Web Share (con WhatsApp como posible destino del sistema) y, si no está disponible o falla sin cancelación del usuario, copia el texto para compartirlo manualmente; sin API de portapapeles, lo presenta para copia manual. Los tickets pendientes se identifican como tales y los sincronizados usan su folio real.
@@ -20,7 +25,7 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
   - **Conversión de encargo a venta en 1 toque**: al entregar pedidos en la siguiente ruta semanal, *"🛒 Convertir a Venta"* carga todas las prendas al carrito, permitiendo ajustes rápidos y cerrando el encargo como entregado al cobrar.
   - **Directorio y selector táctil de clientes**:
     - Memoria local (`cm_clients`) y tabla SQLite (`clients`) para recordar clientes frecuentes.
-    - Autocompletado nativo en teclado móvil (`<datalist>`) y botón rápido *👥 Clientes* con modal de chips táctiles para selección inmediata en una pulsación.
+    - Campo principal con autocompletado semántico de nombre y botón **Elegir cliente guardado** con diálogo de búsqueda y chips táctiles; el selector propio es autoritativo y evita el `datalist` duplicado en móviles.
   - **Migración de esquema SQLite a versión 2**: tablas `clients`, `encargos` y `encargo_items` con soporte de migración automática sin pérdida de datos.
   - **Caché PWA actualizada a `cm-sales-v15`** para propagación instantánea a dispositivos móviles.
 - **Prevención de solapamiento en botón "Finalizar venta"**: la barra flotante móvil (`#mobileCartBar`) ahora se oculta de forma dinámica e instantánea con `IntersectionObserver` cuando el botón *"Finalizar venta"* entra en el campo de visión del usuario, evitando cualquier interferencia táctil al momento de cobrar. Si el usuario sube a revisar productos, la barra reaparece automáticamente.
@@ -55,7 +60,7 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 ### Cambiado
 - **Notación cantidad antes de talla**: el comprobante en pantalla, el texto compartido y el ticket térmico usan la clave `Cantidad # Talla` y líneas como `5 # 4`.
 - **Formato térmico sin pérdida**: los nombres largos se envuelven dentro de las 32 columnas en tickets de venta, resúmenes de taller, detalles por cliente y encargos individuales.
-- **Caché PWA `cm-sales-v18`**: conserva la línea base acumulada hasta v16, incluye el nuevo módulo de interacciones y distribuye el flujo actualizado a los dispositivos.
+- **Caché PWA `cm-sales-v19`**: precarga `receipt-image.js` junto al shell y distribuye de forma alineada el ticket PNG, los controles móviles y el modo e-ink.
 
 ### Corregido
 - `createSale` devuelve una venta existente por UUID antes de revalidar precios contra el catálogo vigente, para que un replay idempotente siga funcionando tras cambios de precio.

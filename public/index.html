@@ -23,6 +23,7 @@
       <span class="dot" id="connDot" aria-hidden="true"></span>
       <span id="connText" role="status">Conectando…</span>
       <span class="pending-badge" id="pendingBadge" hidden></span>
+      <button type="button" id="einkModeBtn" class="btn btn-small eink-toggle" aria-pressed="false">Modo e-ink: desactivado</button>
       <button type="button" id="syncBtn" class="btn btn-small">Sincronizar</button>
     </div>
   </header>
@@ -39,9 +40,15 @@
         <p class="picker-title" id="pickerTitle"></p>
         <p class="picker-step" id="quantityStepLabel">1. Elegí la cantidad</p>
         <div class="qty-row" role="group" aria-labelledby="quantityStepLabel">
-          <button type="button" id="qtyMinus" class="btn qty-btn" aria-label="Quitar uno">−</button>
+          <button type="button" id="qtyMinus" class="btn qty-btn" aria-label="Disminuir cantidad en uno">−</button>
           <span id="qtyValue" class="qty-value" aria-live="polite">1</span>
-          <button type="button" id="qtyPlus" class="btn qty-btn" aria-label="Agregar uno">+</button>
+          <button type="button" id="qtyPlus" class="btn qty-btn" aria-label="Aumentar cantidad en uno">+</button>
+        </div>
+        <div id="qtyPresets" class="qty-presets" role="group" aria-label="Cantidades rápidas">
+          <button type="button" class="btn qty-preset" data-quantity="1" aria-label="Elegir cantidad 1" aria-pressed="true">1</button>
+          <button type="button" class="btn qty-preset" data-quantity="3" aria-label="Elegir cantidad 3" aria-pressed="false">3</button>
+          <button type="button" class="btn qty-preset" data-quantity="5" aria-label="Elegir cantidad 5" aria-pressed="false">5</button>
+          <button type="button" class="btn qty-preset" data-quantity="12" aria-label="Elegir cantidad 12" aria-pressed="false">12</button>
         </div>
         <p class="picker-step" id="sizeStepLabel">2. Elegí la talla</p>
         <div id="sizeChips" class="size-chips" role="group" aria-labelledby="sizeStepLabel"></div>
@@ -70,11 +77,12 @@
         <div class="meta-row total"><span>Total</span><span id="totalVal">$0.00</span></div>
         <div class="meta-row client-row">
           <div class="client-label-group">
-            <label for="clientInput">Cliente</label>
-            <button type="button" id="pickClientBtn" class="btn btn-small btn-pick-client" title="Buscar en lista de clientes">👥 Clientes</button>
+            <label for="clientInput">Cliente (opcional)</label>
+            <button type="button" id="pickClientBtn" class="btn btn-small btn-pick-client" title="Buscar en la lista de clientes">Elegir cliente guardado</button>
           </div>
-          <input id="clientInput" list="clientsDatalist" type="text" maxlength="100" placeholder="Escribe o selecciona cliente" autocomplete="off">
-          <datalist id="clientsDatalist"></datalist>
+          <input id="clientInput" name="customer-name" type="text" maxlength="100" placeholder="Nombre del cliente" autocomplete="name" inputmode="text" autocapitalize="words" enterkeyhint="done" aria-describedby="clientHelp clientSelectionStatus">
+          <p id="clientHelp" class="field-help">Podés escribir un nombre nuevo o elegir uno guardado.</p>
+          <p id="clientSelectionStatus" class="selection-status" role="status" aria-live="polite" hidden></p>
         </div>
         <div id="encargoNotesRow" class="meta-row" hidden>
           <label for="encargoNotesInput">Nota o fecha para el encargo (opcional)</label>
@@ -228,8 +236,8 @@
     <div class="dialog-content">
       <h2 id="clientPickerTitle">Directorio de Clientes</h2>
       <p class="muted">Selecciona un cliente frecuente o escribe uno nuevo.</p>
-      <label class="field-label" for="clientPickerSearch">Nombre del cliente</label>
-      <input id="clientPickerSearch" type="text" maxlength="100" placeholder="Escribe el nombre del cliente..." autocomplete="off">
+      <label class="field-label" for="clientPickerSearch">Buscar o escribir cliente</label>
+      <input id="clientPickerSearch" name="saved-customer-search" type="search" inputmode="search" maxlength="100" placeholder="Nombre del cliente" autocomplete="off" enterkeyhint="done">
       <div class="client-chips-container">
         <p class="picker-subtitle">Clientes guardados:</p>
         <div id="clientChipsList" class="client-chips-list"></div>

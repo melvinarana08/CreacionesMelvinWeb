@@ -2,17 +2,34 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
-## 17. Compartir tickets mediante capacidades del sistema (2026-09-25)
+## 17. Compartir tickets mediante PNG y capacidades del sistema (2026-09-25)
 
-- **Decisión:** compartir un comprobante es una acción iniciada por el usuario y usa Web
-  Share para abrir la hoja nativa del sistema, donde WhatsApp puede aparecer como destino
-  si está instalado; no se incorpora una dependencia específica de WhatsApp. Cuando Web
-  Share no está disponible o falla sin una cancelación explícita, el texto se copia al
-  portapapeles para que el usuario lo pegue; sin esa API, se presenta para copia manual.
+- **Decisión:** generar un PNG determinista desde el modelo de venta con Canvas 2D, sin
+  capturar el DOM ni incorporar dependencias. La imagen usa tipografías del sistema,
+  blanco/negro, ajuste de texto y límites de ancho, alto, DPR y memoria. Se prepara cuando
+  aparece el comprobante y se regenera si el estado pendiente recibe su folio real.
+- **Entrega y respaldo:** la acción sigue iniciada por el usuario. La app consulta
+  `navigator.canShare({ files: [file] })` antes de compartir PNG + texto por Web Share.
+  Sin soporte o ante un fallo no cancelado, descarga el PNG mediante una URL temporal y
+  copia el texto; si el portapapeles no está disponible, ofrece copia manual. Una
+  cancelación `AbortError` no provoca descargas, copias ni diálogos.
 - **Identidad y privacidad:** un ticket pendiente se identifica como pendiente y nunca
-  inventa un folio; tras sincronizarse incluye el folio real. La app no elige destinatarios,
-  no envía el comprobante en segundo plano y no agrega un servicio ni endpoint de difusión:
-  el usuario controla el destino y confirma el envío fuera de la app.
+  inventa un folio. La imagen se genera en el dispositivo; no se sube a un servicio, la app
+  no elige destinatarios ni comparte en segundo plano, y el usuario confirma el destino.
+
+## 18. Controles móviles y modo e-ink explícito (2026-09-25)
+
+- **Decisión:** el campo principal se presenta como **Cliente (opcional)** con semántica de
+  nombre y un selector propio de clientes guardados, sin `datalist` paralelo. Las cantidades
+  rápidas son valores exactos **1, 3, 5 y 12**; −/+ conserva el ajuste fino y el rango 1–99.
+- **E-ink y accesibilidad:** un botón visible guarda `cm_eink_mode` en `localStorage` de
+  forma tolerante a bloqueos y aplica `.eink-mode` en la raíz. El modo usa blanco/negro,
+  bordes sólidos y marcas de texto/contorno; elimina sombras, transparencias y movimiento.
+  `prefers-reduced-motion` y `forced-colors` se atienden por separado, sin inventar una
+  media query de e-ink. Los controles directamente implicados mantienen 44 px como mínimo.
+- **Por qué:** los navegadores no detectan de forma fiable el hardware e-ink. Un control
+  persistido deja la decisión al operador, mientras los presets y la semántica de cliente
+  reducen toques y errores sin cambiar contratos de venta ni datos almacenados.
 
 ## 15. Navegación: salir de administración regresa a la venta (2026-08-28)
 

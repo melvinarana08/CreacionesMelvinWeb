@@ -102,6 +102,19 @@ test('sirve el módulo de interacciones de UI', async (t) => {
   assert.match(source, /export async function performShare\b/);
 });
 
+test('sirve el módulo PNG de comprobantes', async (t) => {
+  const { base, close } = await startServer();
+  t.after(close);
+
+  const response = await fetch(`${base}/receipt-image.js`);
+  const source = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /^text\/javascript(?:;|$)/);
+  assert.match(source, /export function buildReceiptLayout\b/);
+  assert.match(source, /export async function createReceiptPngFile\b/);
+});
+
 test('integración HTTP: flujo completo venta + admin', async (t) => {
   const ctx = await startServer();
   const { base, close } = ctx;

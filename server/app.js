@@ -45,6 +45,7 @@ const STATIC_FILES = new Map([
   ['/styles.css', { file: 'styles.css', type: 'text/css; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
   ['/ui-interactions.js', { file: 'ui-interactions.js', type: 'text/javascript; charset=utf-8' }],
+  ['/receipt-image.js', { file: 'receipt-image.js', type: 'text/javascript; charset=utf-8' }],
   ['/domain.js', { file: 'domain.js', type: 'text/javascript; charset=utf-8' }],
   ['/storage.js', { file: 'storage.js', type: 'text/javascript; charset=utf-8' }],
   ['/api.js', { file: 'api.js', type: 'text/javascript; charset=utf-8' }],

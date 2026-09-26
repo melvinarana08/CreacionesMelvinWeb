@@ -38,6 +38,22 @@ test('loadCatalog devuelve null si no hay caché o está dañada', () => {
   assert.equal(S.loadCatalog(), null);
 });
 
+test('modo e-ink persiste booleano y tolera almacenamiento bloqueado', () => {
+  assert.equal(S.loadEinkMode(), false);
+  assert.equal(S.saveEinkMode(true), true);
+  assert.equal(S.loadEinkMode(), true);
+  assert.equal(localStorage.getItem('cm_eink_mode'), 'true');
+  assert.equal(S.saveEinkMode(false), true);
+  assert.equal(S.loadEinkMode(), false);
+
+  const blocked = {
+    getItem() { throw new Error('bloqueado'); },
+    setItem() { throw new Error('bloqueado'); },
+  };
+  assert.equal(S.loadEinkMode(blocked), false);
+  assert.equal(S.saveEinkMode(true, blocked), false);
+});
+
 test('seguimiento de impresión exitosa se guarda por clave estable', () => {
   assert.equal(S.hasPrintSuccess('sale:abc'), false);
   assert.equal(S.getPrintSuccessAt('sale:abc'), null);

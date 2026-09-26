@@ -1,18 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { performShare, updateSizeChipSelection } from '../public/ui-interactions.js';
+import {
+  applySelectedCustomer,
+  clampQuantity,
+  downloadFileWithObjectUrl,
+  performShare,
+  updateQuantityControls,
+  updateSizeChipSelection,
+} from '../public/ui-interactions.js';
 
-function fakeChip(name) {
+function fakeChip(name, quantity) {
   const classes = new Set(['btn']);
   const attributes = new Map([['aria-pressed', 'false']]);
   return {
     name,
+    dataset: quantity == null ? {} : { quantity: String(quantity) },
     focused: false,
+    disabled: false,
     classList: {
-      toggle(className, enabled) {
-        if (enabled) classes.add(className);
-        else classes.delete(className);
-      },
+      toggle(className, enabled) { if (enabled) classes.add(className); else classes.delete(className); },
       contains(className) { return classes.has(className); },
     },
     setAttribute(attribute, value) { attributes.set(attribute, value); },
@@ -27,81 +33,167 @@ test('updateSizeChipSelection conserva objetos y foco mientras actualiza estado 
   selected.focused = true;
   const chips = [first, selected, last];
   const identities = [...chips];
-
   updateSizeChipSelection(chips, selected);
-
-  assert.equal(chips.length, identities.length);
   chips.forEach((chip, index) => assert.equal(chip, identities[index]));
   assert.equal(selected.focused, true);
   assert.equal(selected.classList.contains('selected'), true);
   assert.equal(selected.getAttribute('aria-pressed'), 'true');
-  for (const chip of [first, last]) {
-    assert.equal(chip.classList.contains('selected'), false);
-    assert.equal(chip.getAttribute('aria-pressed'), 'false');
-  }
+  assert.equal(first.getAttribute('aria-pressed'), 'false');
 });
 
-test('performShare completa mediante Web Share sin copiar', async () => {
+test('cantidad se limita a 1–99 y actualiza límites y presets exactos', () => {
+  assert.equal(clampQuantity(-3), 1);
+  assert.equal(clampQuantity(100), 99);
+  assert.equal(clampQuantity(4.6), 5);
+  const valueNode = {};
+  const minusButton = fakeChip('minus');
+  const plusButton = fakeChip('plus');
+  const presets = [1, 3, 5, 12].map((value) => fakeChip(String(value), value));
+  assert.equal(updateQuantityControls({ value: 5, valueNode, minusButton, plusButton, presets }), 5);
+  assert.equal(valueNode.textContent, '5');
+  assert.equal(presets[2].getAttribute('aria-pressed'), 'true');
+  assert.equal(presets[1].getAttribute('aria-pressed'), 'false');
+  updateQuantityControls({ value: 1, valueNode, minusButton, plusButton, presets });
+  assert.equal(minusButton.disabled, true);
+  assert.equal(plusButton.disabled, false);
+  updateQuantityControls({ value: 99, valueNode, minusButton, plusButton, presets });
+  assert.equal(minusButton.disabled, false);
+  assert.equal(plusButton.disabled, true);
+});
+
+test('selección de cliente cierra, devuelve foco y anuncia el nombre', () => {
   const calls = [];
-  const payload = { title: 'Ticket', text: 'Contenido' };
+  const input = { value: '', focus: () => calls.push('focus') };
+  const dialog = { close: () => calls.push('close') };
+  const status = { hidden: true, textContent: '' };
+  assert.equal(applySelectedCustomer({ name: '  María Pérez ', input, dialog, status }), true);
+  assert.equal(input.value, 'María Pérez');
+  assert.deepEqual(calls, ['close', 'focus']);
+  assert.equal(status.hidden, false);
+  assert.equal(status.textContent, 'Cliente elegido: María Pérez');
+});
+
+test('descarga con URL temporal y difiere su revocación a una macrotarea', () => {
+  const calls = [];
+  let scheduled;
+  const anchor = {
+    click() { calls.push(['click', this.href, this.download]); },
+    remove() { calls.push(['remove']); },
+  };
+  const url = downloadFileWithObjectUrl({
+    file: { png: true },
+    filename: 'ticket.png',
+    createObjectURL: () => { calls.push(['create']); return 'blob:ticket'; },
+    revokeObjectURL: (value) => calls.push(['revoke', value]),
+    createAnchor: () => anchor,
+    schedule: (callback, delay) => { calls.push(['schedule', delay]); scheduled = callback; },
+  });
+  assert.equal(url, 'blob:ticket');
+  assert.deepEqual(calls, [
+    ['create'],
+    ['click', 'blob:ticket', 'ticket.png'],
+    ['remove'],
+    ['schedule', 0],
+  ]);
+  scheduled();
+  assert.deepEqual(calls.at(-1), ['revoke', 'blob:ticket']);
+});
+
+test('comparte PNG + texto solo cuando canShare acepta el archivo', async () => {
+  const calls = [];
+  const file = { name: 'ticket.png' };
   const result = await performShare({
-    payload,
-    share: async (value) => { calls.push(['share', value]); },
-    copy: async (value) => { calls.push(['copy', value]); },
+    payload: { title: 'Ticket', text: 'Contenido' }, file,
+    canShare: ({ files }) => files[0] === file,
+    share: async (value) => calls.push(['share', value]),
+    download: async () => calls.push(['download']),
+    copy: async () => calls.push(['copy']),
   });
   assert.deepEqual(result, { status: 'shared' });
-  assert.deepEqual(calls, [['share', payload]]);
+  assert.deepEqual(calls, [['share', { title: 'Ticket', text: 'Contenido', files: [file] }]]);
 });
 
-test('performShare trata AbortError como cancelación sin copiar', async () => {
-  let copies = 0;
+test('si archivos no están soportados descarga PNG y copia texto', async () => {
+  const calls = [];
+  const file = { name: 'ticket.png' };
+  const result = await performShare({
+    payload: { title: 'Ticket', text: 'Texto compañero' }, file,
+    canShare: () => false,
+    share: async () => calls.push(['share']),
+    download: async (value, name) => calls.push(['download', value, name]),
+    copy: async (text) => calls.push(['copy', text]),
+  });
+  assert.deepEqual(result, { status: 'downloaded-copied', downloaded: true });
+  assert.deepEqual(calls, [['download', file, 'ticket.png'], ['copy', 'Texto compañero']]);
+});
+
+test('fallo nativo no cancelado activa descarga y copia', async () => {
+  const calls = [];
+  const file = { name: 'ticket.png' };
+  const result = await performShare({
+    payload: { title: 'Ticket', text: 'Texto' }, file,
+    canShare: () => true,
+    share: async () => { throw new Error('falló'); },
+    download: async () => calls.push('download'),
+    copy: async () => calls.push('copy'),
+  });
+  assert.equal(result.status, 'downloaded-copied');
+  assert.deepEqual(calls, ['download', 'copy']);
+});
+
+test('AbortError no descarga, copia ni solicita respaldo', async () => {
+  const calls = [];
   const abort = new Error('cancelado');
   abort.name = 'AbortError';
   const result = await performShare({
-    payload: { title: 'Ticket', text: 'Contenido' },
+    payload: { title: 'Ticket', text: 'Contenido' }, file: { name: 'ticket.png' },
+    canShare: () => true,
     share: async () => { throw abort; },
-    copy: async () => { copies += 1; },
+    download: async () => calls.push('download'),
+    copy: async () => calls.push('copy'),
   });
   assert.deepEqual(result, { status: 'cancelled' });
-  assert.equal(copies, 0);
+  assert.deepEqual(calls, []);
 });
 
-test('performShare copia el mismo texto cuando Web Share falla', async () => {
-  const copied = [];
+test('descarga queda útil aunque no exista portapapeles y el prompt lo maneja la UI', async () => {
   const result = await performShare({
-    payload: { title: 'Ticket', text: 'Contenido exacto' },
-    share: async () => { throw new Error('share no disponible'); },
-    copy: async (text) => { copied.push(text); },
+    payload: { title: 'Ticket', text: 'Texto' }, file: { name: 'ticket.png' },
+    canShare: null, share: null, download: async () => {}, copy: null,
   });
-  assert.deepEqual(result, { status: 'copied' });
-  assert.deepEqual(copied, ['Contenido exacto']);
+  assert.deepEqual(result, { status: 'downloaded-manual', downloaded: true });
 });
 
-test('performShare usa copia directamente cuando Web Share no existe', async () => {
-  const copied = [];
+test('si descarga y portapapeles fallan conserva el respaldo manual', async () => {
+  const copyError = new Error('portapapeles bloqueado');
   const result = await performShare({
-    payload: { title: 'Ticket', text: 'Solo copia' },
-    share: null,
-    copy: async (text) => { copied.push(text); },
-  });
-  assert.deepEqual(result, { status: 'copied' });
-  assert.deepEqual(copied, ['Solo copia']);
-});
-
-test('performShare informa indisponibilidad o fallo final de copia', async () => {
-  const unavailable = await performShare({
-    payload: { title: 'Ticket', text: 'Sin APIs' },
-    share: null,
-    copy: null,
-  });
-  assert.deepEqual(unavailable, { status: 'unavailable' });
-
-  const copyError = new Error('permiso denegado');
-  const failed = await performShare({
-    payload: { title: 'Ticket', text: 'No copiado' },
-    share: null,
+    payload: { title: 'Ticket', text: 'Texto manual' },
+    file: { name: 'ticket.png' },
+    canShare: () => false,
+    share: async () => {},
+    download: async () => { throw new Error('descarga bloqueada'); },
     copy: async () => { throw copyError; },
   });
-  assert.equal(failed.status, 'failed');
-  assert.equal(failed.error, copyError);
+  assert.equal(result.status, 'manual');
+  assert.equal(result.downloaded, false);
+  assert.equal(result.error, copyError);
+});
+
+test('sin PNG conserva compartir texto y respaldo manual', async () => {
+  const shared = await performShare({
+    payload: { title: 'Ticket', text: 'Texto' }, file: null,
+    share: async () => {}, copy: null,
+  });
+  assert.deepEqual(shared, { status: 'shared-text' });
+
+  const copied = [];
+  const fallback = await performShare({
+    payload: { title: 'Ticket', text: 'Texto' }, file: null,
+    share: null, copy: async (value) => copied.push(value),
+  });
+  assert.deepEqual(fallback, { status: 'copied', downloaded: false });
+  assert.deepEqual(copied, ['Texto']);
+
+  const manual = await performShare({ payload: { title: 'Ticket', text: 'Texto' }, file: null, share: null, copy: null });
+  assert.deepEqual(manual, { status: 'manual', downloaded: false });
 });

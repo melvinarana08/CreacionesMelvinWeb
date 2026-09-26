@@ -7,7 +7,14 @@ import * as D from './domain.js';
 import * as S from './storage.js';
 import * as Api from './api.js';
 import * as Printer from './printer.js';
-import { performShare, updateSizeChipSelection } from './ui-interactions.js';
+import { createReceiptPngFile, receiptImageFilename } from './receipt-image.js';
+import {
+  applySelectedCustomer,
+  downloadFileWithObjectUrl,
+  performShare,
+  updateQuantityControls,
+  updateSizeChipSelection,
+} from './ui-interactions.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +27,10 @@ const state = {
   discountCents: 0,
   clientName: '',
   receipt: null,
+  receiptImageFile: null,
+  receiptImageToken: 0,
+  receiptImagePreparing: false,
+  sharingReceipt: false,
   online: navigator.onLine,
   pendingCount: 0,
   admin: { csrf: null, authenticated: false },
@@ -166,9 +177,20 @@ function openPicker(product, keepSelection = false) {
     });
     chips.append(chip);
   }
-  $('qtyValue').textContent = String(state.qty);
+  setQuantity(state.qty);
   $('addLineBtn').disabled = state.selectedSize === null;
   $('sizePicker').hidden = false;
+}
+
+function setQuantity(value) {
+  state.qty = updateQuantityControls({
+    value,
+    valueNode: $('qtyValue'),
+    minusButton: $('qtyMinus'),
+    plusButton: $('qtyPlus'),
+    presets: document.querySelectorAll('.qty-preset'),
+  });
+  return state.qty;
 }
 
 // ---------------- Consulta de precios ----------------
@@ -413,33 +435,93 @@ function showShareStatus(message, type = 'saving') {
   node.textContent = message || '';
 }
 
-async function shareCurrentReceipt() {
-  if (!state.receipt) return;
-  const text = D.formatShareTicket(state.receipt);
-  const title = state.receipt.folio
-    ? `Ticket Creaciones Melvin · Folio ${state.receipt.folio}`
-    : 'Ticket Creaciones Melvin · Pendiente de sincronizar';
-  showShareStatus(null);
-
-  const result = await performShare({
-    payload: { title, text },
-    share: typeof navigator.share === 'function' ? (payload) => navigator.share(payload) : null,
-    copy: navigator.clipboard && typeof navigator.clipboard.writeText === 'function'
-      ? (value) => navigator.clipboard.writeText(value)
-      : null,
+function downloadReceiptFile(file, filename) {
+  return downloadFileWithObjectUrl({
+    file,
+    filename,
+    createObjectURL: (value) => URL.createObjectURL(value),
+    revokeObjectURL: (url) => URL.revokeObjectURL(url),
+    createAnchor: () => {
+      const link = document.createElement('a');
+      link.hidden = true;
+      document.body.append(link);
+      return link;
+    },
+    schedule: (callback) => setTimeout(callback, 0),
   });
+}
 
-  if (result.status === 'shared') {
-    showShareStatus('Ticket compartido.', 'success');
-  } else if (result.status === 'cancelled') {
-    showShareStatus('Compartir cancelado.', 'saving');
-  } else if (result.status === 'copied') {
-    showShareStatus('Ticket copiado. Abrí WhatsApp y pegalo en la conversación.', 'success');
-  } else if (result.status === 'unavailable') {
-    window.prompt('Copiá este ticket y pegalo en WhatsApp:', text);
-    showShareStatus('Copiá el ticket mostrado y pegalo en WhatsApp.', 'saving');
-  } else {
-    showShareStatus('No se pudo compartir ni copiar el ticket. Intenta de nuevo.', 'failure');
+async function prepareReceiptImage(receipt) {
+  const token = ++state.receiptImageToken;
+  state.receiptImageFile = null;
+  state.receiptImagePreparing = true;
+  const button = $('shareReceiptBtn');
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  showShareStatus('Preparando imagen del ticket…', 'saving');
+  try {
+    const { file } = await createReceiptPngFile(receipt);
+    if (token !== state.receiptImageToken || state.receipt !== receipt) return;
+    state.receiptImageFile = file;
+    showShareStatus('Imagen lista para compartir.', 'success');
+  } catch (error) {
+    if (token !== state.receiptImageToken || state.receipt !== receipt) return;
+    console.error('No se pudo preparar la imagen del ticket:', error);
+    showShareStatus('No se pudo preparar la imagen. Todavía podés compartir el texto.', 'failure');
+  } finally {
+    if (token === state.receiptImageToken && state.receipt === receipt) {
+      state.receiptImagePreparing = false;
+      button.disabled = state.sharingReceipt;
+      if (!state.sharingReceipt) button.removeAttribute('aria-busy');
+    }
+  }
+}
+
+async function shareCurrentReceipt() {
+  if (!state.receipt || state.sharingReceipt) return;
+  state.sharingReceipt = true;
+  const button = $('shareReceiptBtn');
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  const receipt = state.receipt;
+  const text = D.formatShareTicket(receipt);
+  const title = receipt.folio
+    ? `Ticket Creaciones Melvin · Folio ${receipt.folio}`
+    : 'Ticket Creaciones Melvin · Pendiente de sincronizar';
+  const file = state.receiptImageFile;
+  showShareStatus(file ? 'Abriendo opciones para compartir…' : 'Compartiendo respaldo en texto…', 'saving');
+
+  try {
+    const result = await performShare({
+      payload: { title, text },
+      file,
+      filename: receiptImageFilename(receipt),
+      canShare: typeof navigator.canShare === 'function' ? (payload) => navigator.canShare(payload) : null,
+      share: typeof navigator.share === 'function' ? (payload) => navigator.share(payload) : null,
+      download: file ? downloadReceiptFile : null,
+      copy: navigator.clipboard && typeof navigator.clipboard.writeText === 'function'
+        ? (value) => navigator.clipboard.writeText(value)
+        : null,
+    });
+
+    if (result.status === 'shared' || result.status === 'shared-text') {
+      showShareStatus(result.status === 'shared' ? 'Ticket compartido como imagen.' : 'Ticket compartido como texto.', 'success');
+    } else if (result.status === 'cancelled') {
+      showShareStatus('Compartir cancelado.', 'saving');
+    } else if (result.status === 'downloaded-copied') {
+      showShareStatus('Imagen descargada y texto copiado para compartir.', 'success');
+    } else if (result.status === 'copied') {
+      showShareStatus('Ticket copiado. Abrí WhatsApp y pegalo en la conversación.', 'success');
+    } else {
+      window.prompt('Copiá este ticket y pegalo en WhatsApp:', text);
+      showShareStatus(result.downloaded
+        ? 'Imagen descargada. Copiá el texto mostrado para acompañarla.'
+        : 'Copiá el ticket mostrado y pegalo en WhatsApp.', 'saving');
+    }
+  } finally {
+    state.sharingReceipt = false;
+    button.disabled = state.receiptImagePreparing;
+    if (!state.receiptImagePreparing) button.removeAttribute('aria-busy');
   }
 }
 
@@ -517,6 +599,7 @@ function renderReceipt() {
   total.append(el('span', null, 'TOTAL'), el('span', null, D.formatUSD(r.totalCents)));
   body.append(total);
   body.append(el('p', 'muted', 'Gracias por su compra.'));
+  prepareReceiptImage(r);
 }
 
 function localSaleDisplay(record) {
@@ -1439,7 +1522,6 @@ async function printEncargosSummaryTicketAction(event) {
 
 async function loadClientsList() {
   state.clients = S.loadClients();
-  renderClientsDatalist();
   try {
     const res = await Api.fetchClients();
     if (res.ok && Array.isArray(res.data?.clients)) {
@@ -1447,21 +1529,9 @@ async function loadClientsList() {
         if (c && c.name) S.rememberClient(c.name);
       }
       state.clients = S.loadClients();
-      renderClientsDatalist();
     }
   } catch {
     /* offline */
-  }
-}
-
-function renderClientsDatalist() {
-  const datalist = $('clientsDatalist');
-  if (!datalist) return;
-  datalist.replaceChildren();
-  for (const name of state.clients) {
-    const opt = document.createElement('option');
-    opt.value = name;
-    datalist.append(opt);
   }
 }
 
@@ -1471,6 +1541,18 @@ function openClientPicker() {
   renderClientChips(searchInput.value);
   $('clientPickerDialog').showModal();
   searchInput.focus();
+}
+
+function chooseCustomer(name) {
+  const selected = applySelectedCustomer({
+    name,
+    input: $('clientInput'),
+    dialog: $('clientPickerDialog'),
+    status: $('clientSelectionStatus'),
+  });
+  if (!selected) return;
+  S.rememberClient(name);
+  loadClientsList();
 }
 
 function renderClientChips(filterText = '') {
@@ -1488,12 +1570,7 @@ function renderClientChips(filterText = '') {
   for (const name of matched) {
     const chip = el('button', 'client-chip', name);
     chip.type = 'button';
-    chip.addEventListener('click', () => {
-      $('clientInput').value = name;
-      S.rememberClient(name);
-      loadClientsList();
-      $('clientPickerDialog').close();
-    });
+    chip.addEventListener('click', () => chooseCustomer(name));
     container.append(chip);
   }
 }
@@ -1519,7 +1596,16 @@ async function loadCatalog() {
   renderStatus();
 }
 
+function applyEinkMode(enabled) {
+  document.documentElement.classList.toggle('eink-mode', enabled);
+  const button = $('einkModeBtn');
+  button.setAttribute('aria-pressed', String(enabled));
+  button.textContent = enabled ? '✓ Modo e-ink: activado' : 'Modo e-ink: desactivado';
+}
+
 async function init() {
+  applyEinkMode(S.loadEinkMode());
+
   // Service worker (PWA)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((e) => console.error('SW:', e));
@@ -1528,6 +1614,7 @@ async function init() {
   // Micro-interacción háptica sutil para dispositivos táctiles
   const triggerHaptic = (ms = 12) => {
     try {
+      if (document.documentElement.classList.contains('eink-mode')) return;
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         navigator.vibrate(ms);
       }
@@ -1536,15 +1623,19 @@ async function init() {
 
   // Eventos
   $('qtyMinus').addEventListener('click', () => {
-    state.qty = Math.max(1, state.qty - 1);
-    $('qtyValue').textContent = String(state.qty);
+    setQuantity(state.qty - 1);
     triggerHaptic(10);
   });
   $('qtyPlus').addEventListener('click', () => {
-    state.qty = Math.min(99, state.qty + 1);
-    $('qtyValue').textContent = String(state.qty);
+    setQuantity(state.qty + 1);
     triggerHaptic(10);
   });
+  for (const preset of document.querySelectorAll('.qty-preset')) {
+    preset.addEventListener('click', () => {
+      setQuantity(Number(preset.dataset.quantity));
+      triggerHaptic(10);
+    });
+  }
   $('addLineBtn').addEventListener('click', () => {
     if (state.selectedSize === null) return;
     const product = state.catalog.find((p) => p.name === state.selectedCategory);
@@ -1560,8 +1651,7 @@ async function init() {
     showError('cartError', null);
 
     // Reset de cantidad para el siguiente producto y feedback táctil/visual
-    state.qty = 1;
-    $('qtyValue').textContent = '1';
+    setQuantity(1);
     $('addLineBtn').classList.add('btn-pulse');
     setTimeout(() => $('addLineBtn').classList.remove('btn-pulse'), 250);
     triggerHaptic(16);
@@ -1583,6 +1673,12 @@ async function init() {
   $('closeLocalSalesBtn').addEventListener('click', () => $('localSalesDialog').close());
   $('newSaleBtn').addEventListener('click', () => {
     state.receipt = null;
+    state.receiptImageFile = null;
+    state.receiptImageToken += 1;
+    state.receiptImagePreparing = false;
+    state.sharingReceipt = false;
+    $('shareReceiptBtn').disabled = false;
+    $('shareReceiptBtn').removeAttribute('aria-busy');
     showPrintStatus(null);
     showShareStatus(null);
     $('receiptView').hidden = true;
@@ -1606,7 +1702,8 @@ async function init() {
   }
 
   $('mobileCartBtn')?.addEventListener('click', () => {
-    $('finishBtn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    $('finishBtn')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
   });
   $('togglePasswordBtn')?.addEventListener('click', () => {
     const input = $('adminPasswordInput');
@@ -1615,6 +1712,11 @@ async function init() {
     const isPassword = input.type === 'password';
     input.type = isPassword ? 'text' : 'password';
     btn.textContent = isPassword ? '🙈' : '👁️';
+  });
+  $('einkModeBtn').addEventListener('click', () => {
+    const enabled = !document.documentElement.classList.contains('eink-mode');
+    applyEinkMode(enabled);
+    S.saveEinkMode(enabled);
   });
   $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
   $('pricesBtn').addEventListener('click', openPricesDialog);
@@ -1698,17 +1800,13 @@ async function init() {
   $('closeClientPickerBtn').addEventListener('click', () => $('clientPickerDialog').close());
   $('useClientPickerBtn').addEventListener('click', () => {
     const val = $('clientPickerSearch').value.trim();
-    if (val) {
-      $('clientInput').value = val;
-      S.rememberClient(val);
-      loadClientsList();
-    }
-    $('clientPickerDialog').close();
+    if (val) chooseCustomer(val);
   });
   $('clientPickerSearch').addEventListener('input', () => {
     renderClientChips($('clientPickerSearch').value);
   });
 
+  setQuantity(state.qty);
   renderCart();
   renderStatus();
   renderAppVersion();
@@ -1726,7 +1824,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v18';
+  const swVersion = 'v19';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

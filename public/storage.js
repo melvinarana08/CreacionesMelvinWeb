@@ -12,6 +12,7 @@ const LS_SELLER_TOKEN = 'cm_seller_token';
 const LS_CART = 'cm_cart';
 const LS_CATALOG = 'cm_catalog';
 const LS_PRINT_SUCCESSES = 'cm_print_successes';
+const LS_EINK_MODE = 'cm_eink_mode';
 
 export const RECENT_LOCAL_SALES_LIMIT = 20;
 
@@ -188,6 +189,23 @@ export function loadCart() {
 
 export function clearCart() {
   localStorage.removeItem(LS_CART);
+}
+
+export function loadEinkMode(storage = globalThis.localStorage) {
+  try {
+    return storage?.getItem(LS_EINK_MODE) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveEinkMode(enabled, storage = globalThis.localStorage) {
+  try {
+    storage?.setItem(LS_EINK_MODE, enabled ? 'true' : 'false');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function loadPrintSuccesses() {

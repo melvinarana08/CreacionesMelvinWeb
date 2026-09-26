@@ -122,22 +122,26 @@ test('el footer muestra la versión de la app y la caché del SW', () => {
   assert.match(css, /\.app-version/);
 });
 
-test('barra móvil flotante y layout responsivo de tablet están presentes', () => {
+test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaje corto', () => {
   for (const id of ['mobileCartBar', 'mobileCartCount', 'mobileCartTotal', 'mobileCartBtn', 'togglePasswordBtn']) {
     assert.ok(html.includes(`id="${id}"`), `falta ${id} en index.html`);
   }
   assert.match(css, /\.mobile-cart-bar/);
-  assert.match(css, /@media\s*\(min-width:\s*768px\)\s*\{[\s\S]*#saleView\s*\{[\s\S]*grid-template-columns:/);
+  assert.match(css, /@media\s*\(min-width:\s*768px\)\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(320px,\s*380px\)/);
+  assert.match(css, /overflow-wrap:\s*anywhere/);
+  assert.match(css, /@media\s*\(min-width:\s*768px\)\s*and\s*\(max-height:\s*620px\)/);
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app.js están alineados en caché v18 e incluyen interacciones', () => {
+test('service worker y app están alineados en caché v19 y precargan el PNG', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v18/);
+  assert.match(sw, /cm-sales-v19/);
   assert.match(sw, /'\/ui-interactions\.js'/);
-  assert.match(app, /swVersion = 'v18'/);
+  assert.match(sw, /'\/receipt-image\.js'/);
+  assert.match(app, /swVersion = 'v19'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
+  assert.match(app, /from '\.\/receipt-image\.js'/);
 });
 
 test('selector de venta presenta cantidad antes de talla y exige talla explícita', () => {
@@ -154,6 +158,11 @@ test('selector de venta presenta cantidad antes de talla y exige talla explícit
   const chipHandler = app.match(/chip\.addEventListener\('click', \(\) => \{([\s\S]*?)\n    \}\);/)?.[1] || '';
   assert.match(chipHandler, /updateSizeChipSelection\(chips\.children, chip\)/);
   assert.doesNotMatch(chipHandler, /replaceChildren|openPicker|renderCatalog/);
+  const presets = [...html.matchAll(/class="btn qty-preset" data-quantity="(\d+)"/g)].map((match) => Number(match[1]));
+  assert.deepEqual(presets, [1, 3, 5, 12]);
+  assert.match(app, /function setQuantity\(value\)/);
+  assert.match(app, /updateQuantityControls/);
+  assert.match(css, /\.qty-preset\s*\{[^}]*min-height:\s*44px/s);
 });
 
 test('finalizar venta confirma cliente vacío antes de guardar y bloquea duplicados', () => {
@@ -169,18 +178,22 @@ test('finalizar venta confirma cliente vacío antes de guardar y bloquea duplica
   assert.match(finalize, /finally/);
 });
 
-test('comprobante permite compartir por Web Share o copiar para WhatsApp', () => {
+test('comprobante prepara PNG, evita compartir en paralelo y conserva respaldos', () => {
   for (const id of ['shareReceiptBtn', 'shareStatus']) {
     assert.ok(html.includes(`id="${id}"`), `falta ${id}`);
   }
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(app, /D\.formatShareTicket\(state\.receipt\)/);
-  assert.match(app, /performShare\(\{/);
+  assert.match(app, /createReceiptPngFile\(receipt\)/);
+  assert.match(app, /receiptImageToken/);
+  assert.match(app, /if \(!state\.receipt \|\| state\.sharingReceipt\) return/);
+  assert.match(app, /navigator\.canShare\(payload\)/);
   assert.match(app, /navigator\.share\(payload\)/);
   assert.match(app, /navigator\.clipboard\.writeText\(value\)/);
+  assert.match(app, /downloadFileWithObjectUrl/);
+  assert.match(app, /setTimeout\(callback, 0\)/);
   assert.match(app, /result\.status === 'cancelled'/);
-  assert.match(app, /result\.status === 'copied'/);
-  assert.match(app, /WhatsApp/);
+  assert.match(app, /finally[\s\S]*state\.sharingReceipt = false/);
+  assert.match(css, /\.receipt-actions \.btn\s*\{[^}]*min-height:\s*48px/s);
 });
 
 test('barra flotante móvil previene solapamiento con botón finalizar venta', () => {
@@ -207,7 +220,7 @@ test('módulo de Encargos, Taller y Directorio de Clientes existen en HTML, CSS 
   for (const id of [
     'navSalesBtn', 'navEncargosBtn', 'encargosBadge',
     'cartTitle', 'cancelEncargoModeBtn', 'encargoNotesRow', 'encargoNotesInput',
-    'pickClientBtn', 'clientInput', 'clientsDatalist', 'saveAsEncargoBtn',
+    'pickClientBtn', 'clientInput', 'clientHelp', 'clientSelectionStatus', 'saveAsEncargoBtn',
     'encargosView', 'newEncargoBtn', 'printEncargosSummaryBtn',
     'tabSummaryBtn', 'tabClientsBtn', 'tabDeliveredBtn', 'encargosCountText',
     'encargosSummarySection', 'encargosClientsSection', 'encargosDeliveredSection',
@@ -230,4 +243,30 @@ test('módulo de Encargos, Taller y Directorio de Clientes existen en HTML, CSS 
   assert.match(app, /showEncargosView/);
   assert.match(app, /convertEncargoToSale/);
   assert.match(app, /openClientPicker/);
+  assert.doesNotMatch(html, /clientsDatalist|<datalist/i);
+});
+
+test('cliente opcional usa semántica móvil y selector accesible autoritativo', () => {
+  assert.match(html, /<label for="clientInput">Cliente \(opcional\)<\/label>/);
+  assert.match(html, /id="clientInput"[^>]*name="customer-name"[^>]*autocomplete="name"[^>]*inputmode="text"[^>]*autocapitalize="words"[^>]*enterkeyhint="done"[^>]*aria-describedby="clientHelp clientSelectionStatus"/);
+  assert.match(html, /id="pickClientBtn"[^>]*>Elegir cliente guardado<\/button>/);
+  assert.match(html, /id="clientPickerSearch"[^>]*name="saved-customer-search"[^>]*type="search"/);
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /applySelectedCustomer/);
+  assert.match(css, /#clientInput[^}]*min-height:\s*44px/s);
+  assert.match(css, /\.client-chip[\s\S]*min-height:\s*44px/);
+});
+
+test('modo e-ink persiste en la raíz y respeta contraste y preferencias del sistema', () => {
+  assert.ok(html.includes('id="einkModeBtn"'));
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /applyEinkMode\(S\.loadEinkMode\(\)\)/);
+  assert.match(app, /document\.documentElement\.classList\.toggle\('eink-mode'/);
+  assert.match(app, /S\.saveEinkMode\(enabled\)/);
+  assert.match(app, /contains\('eink-mode'\)\) return/);
+  assert.match(css, /\.eink-mode, \.eink-mode body/);
+  assert.match(css, /\.eink-mode[\s\S]*border:\s*2px solid #000/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
+  assert.match(css, /\.btn\.btn-small\.eink-toggle[\s\S]*min-height:\s*44px/);
 });

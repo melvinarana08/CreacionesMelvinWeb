@@ -19,16 +19,21 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 ### Venta (terminal, sin login)
 - Catálogo inicial desde `productos.json` (incluye **Short**), editable por admin.
 - Flujo de selección **producto → cantidad → talla explícita → agregar** (interfaz de chips,
-  sin tabla horizontal). Elegir la talla conserva la cantidad seleccionada.
+  sin tabla horizontal). Incluye cantidades exactas de un toque **1, 3, 5 y 12**, conserva
+  los controles −/+ para ajuste fino entre 1 y 99, y elegir la talla no cambia la cantidad.
 - Precios **inmutables durante la venta**: cada línea guarda snapshot de nombre/talla/precio.
-- Cliente opcional: un solo campo (nombre o teléfono). Si queda vacío o contiene solo
-  espacios, la app pide confirmación antes de finalizar; cancelar conserva la venta actual.
+- **Cliente (opcional):** campo semántico de nombre con ayudas para teclado/autocompletado
+  móvil y selector propio de clientes guardados. Al elegir uno, el diálogo se cierra, el
+  foco vuelve al campo y un estado accesible anuncia el nombre. Si queda vacío o contiene
+  solo espacios, la app pide confirmación antes de finalizar; cancelar conserva la venta.
 - Descuento manual: no negativo y ≤ subtotal.
 - Comprobante sencillo al finalizar; **el carrito solo se limpia tras guardar localmente**.
-  Desde el comprobante terminado se puede compartir el ticket mediante la hoja nativa del
-  sistema (incluido WhatsApp cuando está disponible como destino). Sin Web Share, o ante
-  un error no causado por cancelación, se copia el texto al portapapeles para pegarlo
-  manualmente; si el navegador no ofrece portapapeles, presenta el texto para copia manual.
+  La app genera localmente un **PNG determinista** desde los datos de la venta (no captura
+  el DOM), lo prepara antes del toque y lo comparte con texto por la hoja nativa solo si
+  `navigator.canShare({ files })` acepta archivos. Si no hay soporte o falla sin cancelación,
+  descarga el PNG y copia el texto; sin portapapeles, lo presenta para copia manual. Una
+  cancelación `AbortError` no descarga ni copia nada. No se suben tickets a terceros ni se
+  elige destinatario automáticamente; el folio real reemplaza al estado pendiente al sincronizar.
 - Cada línea muestra de forma explícita **cantidad, talla, precio unitario y total de línea**
   en el carrito, el comprobante, el detalle administrativo y el ticket térmico. El
   comprobante y la impresión usan la clave **Cantidad # Talla**: `5 # 4` significa cinco
@@ -46,6 +51,9 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   válido se conserva en el dispositivo, se muestra el comprobante y luego se sincroniza.
   UUID idempotente con fallback para HTTP LAN: reenviar la misma venta no la duplica.
 - Indicador en línea/sin conexión + contador de pendientes + botón de sincronización.
+- **Modo e-ink** visible y persistido en el dispositivo: presentación blanco/negro, bordes
+  sólidos, estados seleccionados que no dependen del color y movimiento desactivado. La
+  interfaz también honra `prefers-reduced-motion` y `forced-colors`.
 - Reimpresión no admin: el botón **Reimprimir venta** lista un número acotado de ventas
   recientes guardadas en IndexedDB en ese celular/tablet; si ya sincronizaron, imprime el
   snapshot del servidor con su folio real y, si siguen pendientes, imprime la copia local
@@ -195,7 +203,8 @@ Errores: `{ "error": { "code": "...", "message": "..." } }` con códigos estable
 server/        Backend (http + node:sqlite): main, app (rutas/seguridad), store,
                catalog, money, auth, db, errors
 public/        PWA: index.html, styles.css, app.js, domain.js (puro y testeable),
-               storage.js (IndexedDB), api.js, sw.js, manifest, iconos
+               receipt-image.js (layout/Canvas PNG), storage.js (IndexedDB/localStorage),
+               ui-interactions.js, api.js, sw.js, manifest, iconos
 test/          node:test — unitarias e integración HTTP real
 scripts/       seed.js, backup.mjs, gen-icons.mjs
 productos.json Catálogo inicial (incluye Short)
@@ -206,8 +215,8 @@ CHANGELOG.md        Historial de cambios
 
 ## Limitaciones de esta versión (v0.1)
 
-- El panel permite actualizar precios y agregar productos/tallas. Quitar o renombrar
-  productos/tallas existentes todavía requiere editar `productos.json` y ejecutar el seed.
+- El panel permite agregar, renombrar y eliminar productos y tallas, además de actualizar
+  precios. `productos.json` funciona únicamente como seed inicial y no se reescribe desde el panel.
 - Las ventas se crean solo desde el catálogo vigente del servidor; si un precio cambió
   entre la vista del terminal y el envío, la venta se rechaza con `409 price_changed` y
   queda marcada como conflicto en la cola local (no se pierde, requiere revisión manual).
