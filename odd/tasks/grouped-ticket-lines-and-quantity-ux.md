@@ -9,14 +9,14 @@ Make sale tickets more compact and coherent across thermal printing, shared PNG,
 - Replace quantity presets 1/3/5/12 with 3/6/9/12; preserve +/- and 1–99 bounds.
 - Missing-size guidance is subtle inline UI, not a popup; make the add attempt possible and then report the required size adjacent to the size picker accessibly.
 - After confirming a customer in the picker, do not restore focus to either text input; dismiss suggestions/dialog, announce the selection, and scroll to the checkout/finalize-sale area without reopening the mobile keyboard. Preserve direct free-text entry and the existing choice of optional customer.
-- Preserve untracked user files (`mejoras.txt`, `NUL`). Commit the feature on a non-default feature branch after verification; no push or deployment requested.
+- Preserve untracked user files (`mejoras.txt`, `NUL`). User authorized commit, push, and production deployment after verification.
 
 ## Tasks
 - [x] Map detailed renderer and interaction contracts; settle grouping shape and validation behavior.
 - [x] Update thermal, PNG, and text ticket grouping with regression tests.
 - [x] Update quantity presets, inline missing-size guidance, and customer-confirmation scroll/focus flow with interaction/UI regression tests.
 - [x] Align cache and relevant documentation; run focused/full verification and inspect the diff.
-- [ ] Commit the verified work unit with a Conventional Commit message; record commit evidence.
+- [x] Commit the verified work unit with a Conventional Commit message; record commit evidence.
 
 ## Verification
 - Focused ticket and interaction tests, full `npm test`, `npm run check`, and `git diff --check`.
@@ -30,4 +30,6 @@ Make sale tickets more compact and coherent across thermal printing, shared PNG,
 - Focused verification: `node --test test/printer.test.js test/receipt-image.test.js test/frontend-domain.test.js test/ui-interactions.test.js test/admin-ui-contract.test.js` passed 97/97; `npm run check` passed.
 - Independent read-only verification: `npm test` passed 177/177; `npm run check` passed; `git diff --check` passed (Git emitted LF→CRLF warnings only). No actionable findings; verifier confirmed money/API/storage behavior unchanged and user untracked files preserved.
 - Working tree began on `main` at `da53688`, clean except pre-existing untracked `NUL` and user request `mejoras.txt`; both are preserved.
-- Commit requested by user. Do not deploy or push without authorization.
+- Feature commit: `6910058` (`feat(pos): group ticket items and streamline checkout`) on `feat/grouped-ticket-lines-quantity-ux`.
+- User explicitly authorized push and production deployment; pending push, verified pre-deployment database backup, deployment, and live smoke checks.
+- Preserve untracked user files `mejoras.txt` and `NUL`; do not stage or publish them.
