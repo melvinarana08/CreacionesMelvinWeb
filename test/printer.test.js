@@ -103,7 +103,7 @@ test('formatItemLine: envuelve nombres mayores a 32 columnas sin perder contenid
     lineTotalCents: 3675,
   });
   const rows = out.split('\n');
-  const metadataAt = rows.indexOf('3 # 40');
+  const metadataAt = rows.findIndex((row) => row.startsWith('3 # 40'));
   assert.ok(metadataAt > 1, 'el nombre debe ocupar más de una línea');
   const productRows = rows.slice(0, metadataAt);
   assert.ok(productRows.every((row) => row.length <= 32), 'cada línea del nombre debe caber en 32 columnas');
@@ -112,7 +112,7 @@ test('formatItemLine: envuelve nombres mayores a 32 columnas sin perder contenid
     product.replaceAll(' ', ''),
     'no debe truncar palabras ni tokens largos'
   );
-  assert.match(rows[metadataAt + 1], /\$36\.75/);
+  assert.match(rows.slice(metadataAt).join(' '), /\$36\.75/);
 });
 
 test('formatItemLine: input inválido retorna vacío', () => {
@@ -158,6 +158,21 @@ test('buildTicketBytes: envuelve nombres de venta largos en 32 columnas sin perd
   });
   assertLongProductIsLosslessAndBounded(bytes, product);
   assert.match(new TextDecoder().decode(bytes), /5 # 4/);
+});
+
+test('venta térmica agrupa productos intercalados sin fusionar importes ni alterar el taller', () => {
+  const lines = [
+    { product: 'Pantalón', size: 4, quantity: 2, unitPriceCents: 600, lineTotalCents: 1200 },
+    { product: 'Camisa', size: 'M', quantity: 1, unitPriceCents: 500, lineTotalCents: 500 },
+    { product: 'Pantalón', size: 6, quantity: 3, unitPriceCents: 750, lineTotalCents: 2250 },
+  ];
+  const text = printableTicketLines(buildTicketBytes({ lines, subtotalCents: 3950, discountCents: 0, totalCents: 3950 })).join('\n');
+  assert.equal(text.split('Pantalón').length - 1, 1);
+  assert.ok(text.indexOf('Pantalón') < text.indexOf('3 # 6') && text.indexOf('3 # 6') < text.indexOf('Camisa'));
+  assert.match(text, /2 # 4.*\$6\.00 c\/u.*\$12\.00/);
+  assert.match(text, /3 # 6.*\$7\.50 c\/u.*\$22\.50/);
+  assert.match(text, /Prendas vendidas:\s+6/);
+  assert.ok(printableTicketLines(buildTicketBytes({ lines, subtotalCents: 3950, discountCents: 0, totalCents: 3950 })).every((row) => row.length <= 32));
 });
 
 test('buildTicketBytes: incluye descuento cuando es mayor a cero', () => {

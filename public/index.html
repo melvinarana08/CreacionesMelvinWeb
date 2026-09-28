@@ -51,15 +51,16 @@
           <button type="button" id="qtyPlus" class="btn qty-btn" aria-label="Aumentar cantidad en uno">+</button>
         </div>
         <div id="qtyPresets" class="qty-presets" role="group" aria-label="Cantidades rápidas">
-          <button type="button" class="btn qty-preset" data-quantity="1" aria-label="Elegir cantidad 1" aria-pressed="true">1</button>
           <button type="button" class="btn qty-preset" data-quantity="3" aria-label="Elegir cantidad 3" aria-pressed="false">3</button>
-          <button type="button" class="btn qty-preset" data-quantity="5" aria-label="Elegir cantidad 5" aria-pressed="false">5</button>
+          <button type="button" class="btn qty-preset" data-quantity="6" aria-label="Elegir cantidad 6" aria-pressed="false">6</button>
+          <button type="button" class="btn qty-preset" data-quantity="9" aria-label="Elegir cantidad 9" aria-pressed="false">9</button>
           <button type="button" class="btn qty-preset" data-quantity="12" aria-label="Elegir cantidad 12" aria-pressed="false">12</button>
         </div>
         <p class="picker-step" id="sizeStepLabel">2. Elegí la talla</p>
-        <div id="sizeChips" class="size-chips" role="group" aria-labelledby="sizeStepLabel"></div>
+        <div id="sizeChips" class="size-chips" role="group" aria-labelledby="sizeStepLabel" aria-describedby="sizeGuidance"></div>
+        <p id="sizeGuidance" class="size-guidance" role="status" aria-live="polite" hidden>Elegí una talla antes de agregar.</p>
         <div class="picker-add-row">
-          <button type="button" id="addLineBtn" class="btn btn-primary" disabled>Agregar</button>
+          <button type="button" id="addLineBtn" class="btn btn-primary">Agregar</button>
         </div>
       </div>
     </section>

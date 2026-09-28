@@ -66,14 +66,13 @@ export function shouldDismissCustomerSuggestions({ type, key, target, relatedTar
   return type === 'pointerdown' || type === 'focusout';
 }
 
-/** Aplica una selección, oculta selectores, devuelve foco y anuncia el resultado. */
+/** Aplica una selección, oculta selectores y anuncia el resultado sin abrir el teclado. */
 export function applySelectedCustomer({ name, input, dialog, suggestions, status }) {
   const clean = typeof name === 'string' ? name.trim() : '';
   if (!clean) return false;
   input.value = clean;
   dialog?.close?.();
   if (suggestions) suggestions.hidden = true;
-  input.focus?.();
   if (status) {
     status.hidden = false;
     status.textContent = `Cliente elegido: ${clean}`;

@@ -145,6 +145,16 @@ export function formatUnitPriceSummary(line) {
   return `Cantidad ${line.quantity} · Talla ${line.size} · Unitario ${formatUSD(line.unitPriceCents)}`;
 }
 
+/** Agrupa solo la presentación del ticket; conserva cada línea y su orden original dentro del producto. */
+export function groupReceiptLines(lines) {
+  const groups = new Map();
+  for (const line of lines) {
+    if (!groups.has(line.product)) groups.set(line.product, []);
+    groups.get(line.product).push(line);
+  }
+  return [...groups].map(([product, items]) => ({ product, items }));
+}
+
 /** Construye el texto plano de un comprobante para compartirlo sin depender del DOM. */
 export function formatShareTicket(receipt) {
   if (!receipt || !Array.isArray(receipt.lines)) return '';
@@ -156,12 +166,12 @@ export function formatShareTicket(receipt) {
   if (receipt.savedAt) rows.push(`Fecha: ${receipt.savedAt}`);
   if (receipt.clientName) rows.push(`Cliente: ${receipt.clientName}`);
   rows.push('', 'Producto · Cantidad # Talla');
-  for (const line of receipt.lines) {
-    const lineTotal = computeLineTotal(line.unitPriceCents, line.quantity);
-    rows.push(
-      `${line.product} · ${line.quantity} # ${line.size}`,
-      `Unitario ${formatUSD(line.unitPriceCents)} · Importe ${formatUSD(lineTotal)}`
-    );
+  for (const { product, items } of groupReceiptLines(receipt.lines)) {
+    rows.push(product);
+    for (const line of items) {
+      const lineTotal = computeLineTotal(line.unitPriceCents, line.quantity);
+      rows.push(`  ${line.quantity} # ${line.size} · Unitario ${formatUSD(line.unitPriceCents)} · Importe ${formatUSD(lineTotal)}`);
+    }
   }
   rows.push('', `Subtotal: ${formatUSD(receipt.subtotalCents)}`);
   if (receipt.discountCents > 0) rows.push(`Descuento: -${formatUSD(receipt.discountCents)}`);

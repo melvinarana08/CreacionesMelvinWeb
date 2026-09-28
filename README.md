@@ -19,13 +19,14 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 ### Venta (terminal, sin login)
 - Catálogo inicial desde `productos.json` (incluye **Short**), editable por admin.
 - Flujo de selección **producto → cantidad → talla explícita → agregar** (interfaz de chips,
-  sin tabla horizontal). Incluye cantidades exactas de un toque **1, 3, 5 y 12**, conserva
+  sin tabla horizontal). Incluye cantidades exactas de un toque **3, 6, 9 y 12**, conserva
   los controles −/+ para ajuste fino entre 1 y 99, y elegir la talla no cambia la cantidad.
+  Si se intenta agregar sin talla, aparece una indicación accesible junto al selector, sin popup.
 - Precios **inmutables durante la venta**: cada línea guarda snapshot de nombre/talla/precio.
 - **Cliente (opcional):** campo de texto libre con teclado móvil, sugerencias inline de
   hasta ocho nombres recientes y un directorio completo separado. Las sugerencias filtran
-  por subcadena al escribir; al elegir una, el foco vuelve al campo y un estado accesible
-  anuncia el nombre. `autocomplete="off"` y un nombre específico de venta reducen falsos
+  por subcadena al escribir; al elegir una, se cierran los selectores sin devolver el foco
+  al teclado, se anuncia el nombre y la vista baja hasta Finalizar venta. `autocomplete="off"` y un nombre específico de venta reducen falsos
   avisos de credenciales en Chrome, pero sus heurísticas no se pueden controlar por completo.
   Si queda vacío o contiene solo espacios, la app pide confirmación antes de finalizar.
 - Descuento manual: no negativo y ≤ subtotal.
@@ -35,8 +36,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   `navigator.canShare({ files })` acepta archivos. Si no hay soporte o falla sin cancelación,
   descarga el PNG y copia el texto; sin portapapeles, lo presenta para copia manual. Una
   cancelación `AbortError` no descarga ni copia nada. Las líneas del PNG y del respaldo en
-  texto muestran primero el producto y después cantidad/talla (`Camisa · 4 # 5`) sin perder
-  nombres largos. No se suben tickets a terceros ni se elige destinatario automáticamente;
+  texto agrupan todas las líneas del mismo producto bajo un solo nombre (en orden de
+  primera aparición), con filas `4 # 5 · unitario · importe` sin perder nombres largos. No se suben tickets a terceros ni se elige destinatario automáticamente;
   el folio real reemplaza al estado pendiente al sincronizar.
 - Cada línea muestra de forma explícita **cantidad, talla, precio unitario y total de línea**
   en el carrito, el comprobante, el detalle administrativo y el ticket térmico. El
@@ -47,6 +48,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 - Impresión térmica Bluetooth ESC/POS (58 mm) desde Chrome/Edge Android: comprobante de
   venta, reimpresión administrativa y reimpresión local de ventas recientes guardadas en
   el mismo dispositivo.
+- El ticket térmico de venta también agrupa por producto y conserva cada cantidad, talla,
+  precio unitario e importe en filas compactas; taller y encargos mantienen su formato.
 - Los tickets térmicos mantienen el ancho de 32 columnas y envuelven nombres largos sin
   perder texto en ventas, resúmenes de taller, detalles por cliente y encargos individuales.
 - Las líneas del carrito, la venta guardada y el comprobante se agrupan automáticamente

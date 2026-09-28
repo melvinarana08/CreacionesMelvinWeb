@@ -163,12 +163,25 @@ test('formatShareTicket genera ticket sincronizado con producto antes de cantida
   assert.match(text, /Folio: 42/);
   assert.match(text, /Cliente: María/);
   assert.match(text, /Producto · Cantidad # Talla/);
-  assert.match(text, /Camisa escolar · 5 # 4/);
-  assert.match(text, /Chaleco · 1 # XL/);
-  assert.match(text, /Unitario \$6\.00 · Importe \$30\.00/);
+  assert.match(text, /Camisa escolar\n  5 # 4 · Unitario \$6\.00 · Importe \$30\.00/);
+  assert.match(text, /Chaleco\n  1 # XL/);
   assert.match(text, /Subtotal: \$42\.25/);
   assert.match(text, /Descuento: -\$2\.25/);
   assert.match(text, /Total: \$40\.00/);
+});
+
+test('texto compartido agrupa apariciones no contiguas preservando todos los detalles', () => {
+  const lines = [
+    { product: 'Pantalón', size: 4, quantity: 2, unitPriceCents: 600 },
+    { product: 'Camisa', size: 'M', quantity: 1, unitPriceCents: 500 },
+    { product: 'Pantalón', size: 6, quantity: 3, unitPriceCents: 750 },
+  ];
+  const text = D.formatShareTicket({ lines, folio: 1, subtotalCents: 3950, discountCents: 0, totalCents: 3950 });
+  assert.equal(text.split('Pantalón').length - 1, 1);
+  assert.ok(text.indexOf('Pantalón') < text.indexOf('3 # 6') && text.indexOf('3 # 6') < text.indexOf('Camisa'));
+  assert.match(text, /2 # 4 · Unitario \$6\.00 · Importe \$12\.00/);
+  assert.match(text, /3 # 6 · Unitario \$7\.50 · Importe \$22\.50/);
+  assert.deepEqual(lines.map((line) => line.product), ['Pantalón', 'Camisa', 'Pantalón']);
 });
 
 test('formatShareTicket identifica recibo pendiente y omite cliente y descuento vacíos', () => {
@@ -182,7 +195,7 @@ test('formatShareTicket identifica recibo pendiente y omite cliente y descuento 
     totalCents: 3000,
   });
   assert.match(text, /Estado: Pendiente de sincronizar/);
-  assert.match(text, /Pantalón · 2 # A medida/);
+  assert.match(text, /Pantalón\n  2 # A medida/);
   assert.doesNotMatch(text, /Folio:/);
   assert.doesNotMatch(text, /Cliente:/);
   assert.doesNotMatch(text, /Descuento:/);
@@ -197,7 +210,7 @@ test('formatShareTicket conserva un producto largo antes de cantidad y talla', (
     discountCents: 0,
     totalCents: 2400,
   });
-  assert.ok(text.includes(`${product} · 4 # 5`));
+  assert.ok(text.includes(`${product}\n  4 # 5`));
   assert.ok(text.indexOf(product) < text.indexOf('4 # 5'));
 });
 

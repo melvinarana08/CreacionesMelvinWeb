@@ -168,6 +168,8 @@ function openPicker(product, keepSelection = false) {
     state.selectedSize = null;
   }
   $('pickerTitle').textContent = `${product.name} — cantidad y talla`;
+  $('sizeGuidance').hidden = true;
+  $('sizeChips').removeAttribute('aria-invalid');
   const chips = $('sizeChips');
   chips.replaceChildren();
   for (const s of product.sizes) {
@@ -177,12 +179,12 @@ function openPicker(product, keepSelection = false) {
     chip.addEventListener('click', () => {
       state.selectedSize = s.size;
       updateSizeChipSelection(chips.children, chip);
-      $('addLineBtn').disabled = false;
+      $('sizeGuidance').hidden = true;
+      chips.removeAttribute('aria-invalid');
     });
     chips.append(chip);
   }
   setQuantity(state.qty);
-  $('addLineBtn').disabled = state.selectedSize === null;
   $('sizePicker').hidden = false;
 }
 
@@ -1595,6 +1597,7 @@ function chooseCustomer(name) {
   S.rememberClient(name);
   state.clients = S.loadClients();
   loadClientsList();
+  $('finishBtn').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function renderClientChips(filterText = '') {
@@ -1682,7 +1685,11 @@ async function init() {
     });
   }
   $('addLineBtn').addEventListener('click', () => {
-    if (state.selectedSize === null) return;
+    if (state.selectedSize === null) {
+      $('sizeGuidance').hidden = false;
+      $('sizeChips').setAttribute('aria-invalid', 'true');
+      return;
+    }
     const product = state.catalog.find((p) => p.name === state.selectedCategory);
     if (!product) return;
     const price = product.sizes.find((s) => s.size === state.selectedSize)?.priceCents;
@@ -1893,7 +1900,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v20';
+  const swVersion = 'v21';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

@@ -51,9 +51,9 @@ test('cantidad se limita a 1–99 y actualiza límites y presets exactos', () =>
   const valueNode = {};
   const minusButton = fakeChip('minus');
   const plusButton = fakeChip('plus');
-  const presets = [1, 3, 5, 12].map((value) => fakeChip(String(value), value));
-  assert.equal(updateQuantityControls({ value: 5, valueNode, minusButton, plusButton, presets }), 5);
-  assert.equal(valueNode.textContent, '5');
+  const presets = [3, 6, 9, 12].map((value) => fakeChip(String(value), value));
+  assert.equal(updateQuantityControls({ value: 9, valueNode, minusButton, plusButton, presets }), 9);
+  assert.equal(valueNode.textContent, '9');
   assert.equal(presets[2].getAttribute('aria-pressed'), 'true');
   assert.equal(presets[1].getAttribute('aria-pressed'), 'false');
   updateQuantityControls({ value: 1, valueNode, minusButton, plusButton, presets });
@@ -64,7 +64,7 @@ test('cantidad se limita a 1–99 y actualiza límites y presets exactos', () =>
   assert.equal(plusButton.disabled, true);
 });
 
-test('selección de cliente cierra, oculta sugerencias, devuelve foco y anuncia el nombre', () => {
+test('selección de cliente cierra, oculta sugerencias, no enfoca el teclado y anuncia el nombre', () => {
   const calls = [];
   const input = { value: '', focus: () => calls.push('focus') };
   const dialog = { close: () => calls.push('close') };
@@ -73,7 +73,7 @@ test('selección de cliente cierra, oculta sugerencias, devuelve foco y anuncia 
   assert.equal(applySelectedCustomer({ name: '  María Pérez ', input, dialog, suggestions, status }), true);
   assert.equal(input.value, 'María Pérez');
   assert.equal(suggestions.hidden, true);
-  assert.deepEqual(calls, ['close', 'focus']);
+  assert.deepEqual(calls, ['close']);
   assert.equal(status.hidden, false);
   assert.equal(status.textContent, 'Cliente elegido: María Pérez');
 });

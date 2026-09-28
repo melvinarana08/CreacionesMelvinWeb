@@ -133,13 +133,13 @@ test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaj
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app están alineados en caché v20 y precargan el shell cambiado', () => {
+test('service worker y app están alineados en caché v21 y precargan el shell cambiado', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v20/);
+  assert.match(sw, /cm-sales-v21/);
   assert.match(sw, /'\/ui-interactions\.js'/);
   assert.match(sw, /'\/receipt-image\.js'/);
-  assert.match(app, /swVersion = 'v20'/);
+  assert.match(app, /swVersion = 'v21'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
   assert.match(app, /from '\.\/receipt-image\.js'/);
 });
@@ -149,17 +149,21 @@ test('selector de venta presenta cantidad antes de talla y exige talla explícit
   const sizeAt = html.indexOf('id="sizeStepLabel"');
   const addAt = html.indexOf('id="addLineBtn"');
   assert.ok(quantityAt >= 0 && quantityAt < sizeAt && sizeAt < addAt);
-  assert.match(html, /id="addLineBtn"[^>]*disabled/);
+  assert.doesNotMatch(html, /id="addLineBtn"[^>]*disabled/);
+  assert.match(html, /id="sizeGuidance"[^>]*role="status"[^>]*aria-live="polite"[^>]*hidden/);
+  assert.match(html, /id="sizeChips"[^>]*aria-describedby="sizeGuidance"/);
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
   assert.match(app, /state\.selectedSize = null/);
   assert.doesNotMatch(app, /state\.selectedSize = product\.sizes\[0\]\.size/);
   assert.doesNotMatch(app, /state\.selectedSize = s\.size;\s*state\.qty = 1/);
-  assert.match(app, /addLineBtn'\)\.disabled = state\.selectedSize === null/);
+  assert.match(app, /if \(state\.selectedSize === null\) \{[\s\S]*sizeGuidance'\)\.hidden = false/);
+  assert.match(app, /sizeGuidance'\)\.hidden = true/);
+  assert.match(app, /finishBtn'\)\.scrollIntoView/);
   const chipHandler = app.match(/chip\.addEventListener\('click', \(\) => \{([\s\S]*?)\n    \}\);/)?.[1] || '';
   assert.match(chipHandler, /updateSizeChipSelection\(chips\.children, chip\)/);
   assert.doesNotMatch(chipHandler, /replaceChildren|openPicker|renderCatalog/);
   const presets = [...html.matchAll(/class="btn qty-preset" data-quantity="(\d+)"/g)].map((match) => Number(match[1]));
-  assert.deepEqual(presets, [1, 3, 5, 12]);
+  assert.deepEqual(presets, [3, 6, 9, 12]);
   assert.match(app, /function setQuantity\(value\)/);
   assert.match(app, /updateQuantityControls/);
   assert.match(css, /\.qty-preset\s*\{[^}]*min-height:\s*44px/s);

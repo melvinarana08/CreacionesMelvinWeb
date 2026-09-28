@@ -2,6 +2,19 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 19. Presentación agrupada de tickets y continuidad móvil
+
+- **Venta:** agrupar todas las líneas de un mismo producto solo al renderizar el ticket
+  térmico, PNG o texto, en orden de primera aparición. Cada línea conserva cantidad,
+  talla, precio unitario e importe; no se consolidan tallas ni se recalculan snapshots.
+  Si una fila excede las 32 columnas térmicas, se divide sin truncar información.
+  Taller y encargos conservan sus propios formatos; API, cálculos y persistencia no cambian.
+- **Selección:** atajos 3/6/9/12, ajuste −/+ entre 1 y 99 y guía inline accesible al
+  intentar agregar sin talla. Confirmar un cliente cierra las sugerencias y el diálogo,
+  anuncia el nombre sin enfocar inputs y desplaza al botón Finalizar venta. El nombre sigue
+  siendo texto libre opcional.
+- **Distribución:** incrementar en conjunto la caché del SW y la versión visible a v21.
+
 ## 17. Compartir tickets mediante PNG y capacidades del sistema (2026-09-25)
 
 - **Decisión:** generar un PNG determinista desde el modelo de venta con Canvas 2D, sin
@@ -13,9 +26,9 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
   Sin soporte o ante un fallo no cancelado, descarga el PNG mediante una URL temporal y
   copia el texto; si el portapapeles no está disponible, ofrece copia manual. Una
   cancelación `AbortError` no provoca descargas, copias ni diálogos.
-- **Orden legible:** las líneas del PNG y del respaldo en texto presentan primero el nombre
+- **Orden legible (formato previo):** las líneas del PNG y del respaldo en texto presentan primero el nombre
   completo del producto y luego cantidad/talla (`Camisa · 4 # 5`). El ajuste conserva los
-  nombres largos; el DOM y la impresión térmica ya eran producto-primero y no se modifican.
+  nombres largos; la decisión 19 reemplaza la presentación de tickets de venta.
 - **Identidad y privacidad:** un ticket pendiente se identifica como pendiente y nunca
   inventa un folio. La imagen se genera en el dispositivo; no se sube a un servicio, la app
   no elige destinatarios ni comparte en segundo plano, y el usuario confirma el destino.

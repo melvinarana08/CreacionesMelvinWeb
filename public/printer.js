@@ -3,6 +3,8 @@
 // Cero dependencias. Compatible con Android Chrome/Edge (Web Bluetooth).
 'use strict';
 
+import { groupReceiptLines } from './domain.js';
+
 // ---- Constantes ESC/POS ----
 
 const ESC = 0x1b;
@@ -140,8 +142,16 @@ export function formatItemLine(line) {
   const metadata = `${line.quantity} # ${line.size}`;
   const unit = `$${centsToText(line.unitPriceCents)} c/u`;
   const total = `$${centsToText(line.lineTotalCents)}`;
-  const space = Math.max(1, COLS - unit.length - total.length);
-  return `${wrapText(line.product).join('\n')}\n${metadata}\n${unit}${' '.repeat(space)}${total}`;
+  return `${wrapText(line.product).join('\n')}\n${formatItemDetail(line)}`;
+}
+
+function formatItemDetail(line) {
+  const metadata = `${line.quantity} # ${line.size}`;
+  const unit = `$${centsToText(line.unitPriceCents)} c/u`;
+  const total = `$${centsToText(line.lineTotalCents)}`;
+  const prices = `${unit} ${total}`;
+  if (metadata.length + 1 + prices.length <= COLS) return formatTwoCols(metadata, prices);
+  return `${wrapText(metadata).join('\n')}\n${formatTwoCols(unit, total)}`;
 }
 
 /**
@@ -198,11 +208,14 @@ export function buildTicketBytes(receipt) {
   push([LF]);
 
   let totalQty = 0;
-  for (const line of receipt.lines) {
-    if (line && typeof line.quantity === 'number') totalQty += line.quantity;
-    const formatted = formatItemLine(line);
-    push(encodeText(formatted));
+  for (const { product, items } of groupReceiptLines(receipt.lines)) {
+    push(encodeText(wrapText(product).join('\n')));
     push([LF]);
+    for (const line of items) {
+      if (typeof line.quantity === 'number') totalQty += line.quantity;
+      push(encodeText(formatItemDetail(line)));
+      push([LF]);
+    }
   }
 
   push(encodeText('-'.repeat(COLS)));

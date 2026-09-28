@@ -35,17 +35,29 @@ test('layout conserva contenido, Unicode, cantidad 99, importes y cierre', () =>
   assert.match(text, /Producto · Cantidad # Talla/);
   assert.match(text, /99 # A medida/);
   assert.match(text, /Ñandutí/);
-  assert.match(text, /Unitario\s+\$6\.25/);
-  assert.match(text, /Importe \$618\.75/);
+  assert.match(text, /\$6\.25 c\/u/);
+  assert.match(text, /\$618\.75/);
   assert.match(text, /Descuento/);
   assert.match(text, /TOTAL/);
   assert.match(text, /Gracias por su\s+compra/);
   assert.ok(layout.height > 480, 'el alto crece con contenido envuelto');
   const flattened = layout.commands.filter((c) => c.type === 'text').map((c) => c.text).join(' ');
   assert.ok(
-    flattened.includes('Camisa escolar manga larga edición especial · 99 # A medida'),
+    flattened.includes('Camisa escolar manga larga edición especial') && flattened.indexOf('Camisa escolar') < flattened.indexOf('99 # A medida'),
     'el nombre largo se conserva completo y aparece antes de cantidad/talla'
   );
+});
+
+test('PNG agrupa productos no contiguos sin perder filas ni importes', () => {
+  const layout = buildReceiptLayout(receipt({ lines: [
+    { product: 'Pantalón', size: 4, quantity: 2, unitPriceCents: 600 },
+    { product: 'Camisa', size: 'M', quantity: 1, unitPriceCents: 500 },
+    { product: 'Pantalón', size: 6, quantity: 3, unitPriceCents: 750 },
+  ] }));
+  const text = commandText(layout);
+  assert.equal(text.split('Pantalón').length - 1, 1);
+  assert.ok(text.indexOf('Pantalón') < text.indexOf('3 # 6') && text.indexOf('3 # 6') < text.indexOf('Camisa'));
+  for (const detail of ['2 # 4', '$6.00 c/u', '$12.00', '3 # 6', '$7.50 c/u', '$22.50']) assert.ok(text.includes(detail), detail);
 });
 
 test('layout pendiente omite cliente/descuento y respeta tamaños acotados', () => {

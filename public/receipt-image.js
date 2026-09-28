@@ -1,6 +1,8 @@
 // receipt-image.js — modelo y render PNG de comprobantes, sin dependencias.
 'use strict';
 
+import { groupReceiptLines } from './domain.js';
+
 const DEFAULTS = Object.freeze({
   width: 720,
   minWidth: 320,
@@ -109,9 +111,11 @@ export function buildReceiptLayout(receipt, options = {}) {
   addRule();
   addText('Producto · Cantidad # Talla', { size: config.smallFontSize, weight: '700' });
 
-  for (const line of receipt.lines) {
-    addText(`${line.product} · ${line.quantity} # ${line.size}`, { weight: '700', gap: 5 });
-    addPair(`Unitario ${money(line.unitPriceCents)}`, `Importe ${money(line.unitPriceCents * line.quantity)}`);
+  for (const { product, items } of groupReceiptLines(receipt.lines)) {
+    addText(product, { weight: '700', gap: 5 });
+    for (const line of items) {
+      addPair(`${line.quantity} # ${line.size} · ${money(line.unitPriceCents)} c/u`, money(line.unitPriceCents * line.quantity));
+    }
   }
   addRule();
   addPair('Subtotal', money(receipt.subtotalCents));

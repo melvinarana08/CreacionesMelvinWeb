@@ -4,14 +4,20 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 
 ## [Unreleased]
 
+### Ajustes de tickets y venta
+- Los tickets de venta térmicos, PNG y de texto agrupan productos intercalados en orden de primera aparición, con nombre único y cada fila de cantidad/talla, unitario e importe conservada. No cambia el formato de taller/encargos ni los datos guardados.
+- Atajos de cantidad 3, 6, 9 y 12; −/+ mantienen el rango 1–99. Intentar agregar sin talla muestra una guía inline accesible junto al selector.
+- Confirmar un cliente cierra selector/sugerencias sin volver a enfocar el teclado, anuncia el nombre y desplaza hacia Finalizar venta; el campo sigue siendo libre y opcional.
+- Caché del frontend actualizada a `cm-sales-v21` y regresiones ejecutables para los tres tickets y los controles.
+
 ### Añadido
 - **Selector de tema Claro/Noche/E-ink**: persiste una única preferencia `light|dark|eink`, migra el legado e-ink, actualiza el color del navegador y mantiene Noche coloreado e independiente de las restricciones monocromas, hápticas y de movimiento de E-ink.
 - **Clientes recientes inline**: foco o toque en el cliente opcional muestra hasta ocho nombres recientes como botones táctiles, con filtro por subcadena, selección anunciada y cierres seguros por Escape, foco o interacción exterior; el directorio completo sigue disponible.
 - **Ticket visual PNG sin dependencias**: el comprobante se compone de forma determinista desde el modelo de venta y se dibuja con Canvas 2D en blanco y negro, con texto Unicode, nombres largos, tallas personalizadas, cantidades hasta 99, alto dinámico y límites de tamaño/DPR.
 - **Compartir imagen primero con respaldo privado**: el PNG se prepara antes del toque y solo se entrega a Web Share cuando `navigator.canShare({ files })` lo admite. Sin soporte o ante un fallo no cancelado, se descarga la imagen y se copia el texto; sin portapapeles se ofrece copia manual. `AbortError` no dispara descarga, copia ni diálogo.
-- **Cantidades rápidas exactas 1, 3, 5 y 12**: selección de un toque, además de −/+ y el límite existente de 1–99; elegir talla no modifica la cantidad.
+- **Cantidades rápidas anteriores 1, 3, 5 y 12**: selección de un toque, además de −/+ y el límite existente de 1–99; elegir talla no modifica la cantidad.
 - **Modo e-ink persistido**: control visible con blanco/negro, bordes sólidos, estados no dependientes del color y movimiento desactivado; también se respetan reducción de movimiento y colores forzados del sistema.
-- **Cliente opcional optimizado para móvil**: semántica de nombre, ayuda breve, búsqueda separada de clientes guardados, objetivos táctiles de 44 px, retorno de foco y anuncio accesible de la selección.
+- **Cliente opcional optimizado para móvil**: semántica de nombre, ayuda breve, búsqueda separada de clientes guardados, objetivos táctiles de 44 px, anuncio accesible de la selección (sin retorno de foco tras confirmar).
 - **Flujo de venta cantidad primero**: la selección sigue producto → cantidad → talla explícita → agregar, y elegir una talla conserva la cantidad indicada.
 - **Confirmación de venta anónima**: finalizar con el cliente vacío o compuesto solo por espacios exige confirmación; cancelar conserva el carrito y no guarda ni sincroniza la venta.
 - **Compartir ticket digital**: el comprobante terminado abre la hoja nativa de Web Share (con WhatsApp como posible destino del sistema) y, si no está disponible o falla sin cancelación del usuario, copia el texto para compartirlo manualmente; sin API de portapapeles, lo presenta para copia manual. Los tickets pendientes se identifican como tales y los sincronizados usan su folio real.
@@ -60,7 +66,7 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - **Web Bluetooth requiere HTTPS**: `isWebBluetoothAvailable` verifica `window.isSecureContext` y el mensaje de error guía a la URL HTTPS de Tailscale Serve (`gym-node-02.tail4a98b6.ts.net`), que es el secure context necesario.
 
 ### Cambiado
-- **Compartir con producto primero**: las líneas del PNG y del respaldo en texto usan `Producto · Cantidad # Talla`, por ejemplo `Camisa · 4 # 5`, conservando completos los nombres largos. El DOM y la impresión térmica mantienen su comportamiento existente.
+- **Compartir con producto primero (formato anterior)**: las líneas del PNG y del respaldo en texto usaban `Producto · Cantidad # Talla`; el nuevo formato de venta agrupa bajo una cabecera única.
 - **Mitigación de autocompletado de credenciales**: el cliente opcional usa `autocomplete="off"` y un nombre específico de venta; el password admin queda dentro de un formulario de login con `current-password`. Son indicaciones estándar y no garantizan que Chrome ignore sus propias heurísticas.
 - **Formato térmico sin pérdida**: los nombres largos se envuelven dentro de las 32 columnas en tickets de venta, resúmenes de taller, detalles por cliente y encargos individuales.
 - **Caché PWA `cm-sales-v20`**: distribuye de forma alineada los tres temas, el orden de compartición y las sugerencias inline dentro del shell offline.
