@@ -31,5 +31,6 @@ Make sale tickets more compact and coherent across thermal printing, shared PNG,
 - Independent read-only verification: `npm test` passed 177/177; `npm run check` passed; `git diff --check` passed (Git emitted LF→CRLF warnings only). No actionable findings; verifier confirmed money/API/storage behavior unchanged and user untracked files preserved.
 - Working tree began on `main` at `da53688`, clean except pre-existing untracked `NUL` and user request `mejoras.txt`; both are preserved.
 - Feature commit: `6910058` (`feat(pos): group ticket items and streamline checkout`) on `feat/grouped-ticket-lines-quantity-ux`.
-- User explicitly authorized push and production deployment; pending push, verified pre-deployment database backup, deployment, and live smoke checks.
+- Feature branch pushed to `origin/feat/grouped-ticket-lines-quantity-ux`; both commits `6910058` and `b3b1844` are present remotely.
+- User explicitly authorized production deployment. Current production was read-only checked healthy at `http://192.168.1.134:3002/api/health` (v0.1.0). Deployment/backup is paused until the user approves the Tailscale SSH check at `https://login.tailscale.com/a/l1d1fecfb365a74`; no production changes or backup have been made yet.
 - Preserve untracked user files `mejoras.txt` and `NUL`; do not stage or publish them.
