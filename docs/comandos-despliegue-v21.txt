@@ -1,0 +1,80 @@
+DESPLIEGUE CREACIONES MELVIN — V21
+==================================
+
+DESPLIEGUE DE UNA SOLA VEZ: ya ejecutado el 2026-09-28.
+El código V21 ya está en el servidor como archivo tar y el respaldo de ventas fue verificado.
+El tar se generó desde `ecb7bcc`; la implementación del producto está en `6910058`.
+Este archivo separa el paso local del bloque que se pega en la terminal del servidor.
+
+1) EN LA TERMINAL LOCAL, conectate al servidor:
+
+ssh root@100.97.20.79
+
+Esperá a ver el prompt del servidor. Después copiá y pegá TODO el bloque siguiente de una sola vez.
+
+2) EN LA TERMINAL DEL SERVIDOR, pegá este bloque completo:
+
+set -e
+archive=/tmp/creaciones-melvin-v21-ecb7bcc.tar.gz
+archive_sha=95c6a41021b867ae67ec9ff5f47d1542dc9226c27653678f103dab49850bc493
+release=/home/operator1/releases/creaciones-melvin-v21-ecb7bcc-20260928-0728
+stack=/home/operator1/stacks/creaciones-melvin
+backup_dir=/home/operator1/backups
+backup_name=sales-2026-09-28T07-25-03-989Z.db
+base=http://192.168.1.134:3002
+
+printf '%s  %s\n' "$archive_sha" "$archive" | sha256sum -c -
+(cd "$backup_dir" && sha256sum -c "$backup_name.sha256")
+curl -fsS "$base/api/health"
+printf '\n'
+test -f "$stack/.env"
+test -x "$stack/rollback.sh"
+test ! -e "$release"
+mkdir -p "$release"
+tar -xzf "$archive" -C "$release"
+chown -R operator1:operator1 "$release"
+
+docker compose --project-directory "$release" --env-file "$stack/.env" -f "$release/compose.yaml" config -q
+
+docker compose --project-directory "$release" --env-file "$stack/.env" -f "$release/compose.yaml" up -d --build
+
+printf '\n--- Salud de producción ---\n'
+curl -fsS "$base/api/health"
+printf '\n'
+docker compose --project-directory "$release" --env-file "$stack/.env" -f "$release/compose.yaml" ps
+
+printf '\n--- Caché v21 ---\n'
+curl -fsS "$base/sw.js" | grep -F 'cm-sales-v21'
+
+printf '\n--- Atajos de cantidad ---\n'
+html=$(curl -fsS "$base/")
+for quantity in 3 6 9 12; do
+  printf '%s' "$html" | grep -F "data-quantity=\"$quantity\""
+done
+
+printf '\n--- Módulos frontend ---\n'
+for asset in app.js domain.js printer.js receipt-image.js ui-interactions.js; do
+  code=$(curl -sS -o /dev/null -w '%{http_code}' "$base/$asset")
+  printf '%s %s\n' "$asset" "$code"
+  test "$code" = 200
+done
+
+printf '\n--- Volumen persistente ---\n'
+mounts=$(docker inspect creaciones-melvin-sales-1 --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}')
+printf '%s\n' "$mounts"
+printf '%s\n' "$mounts" | grep -F 'creaciones-melvin_sales-data /app/data'
+
+printf '\n--- Ventas preservadas ---\n'
+sales=$(docker exec creaciones-melvin-sales-1 node --input-type=module -e 'import {DatabaseSync} from "node:sqlite"; const db=new DatabaseSync("/app/data/sales.db",{readOnly:true}); console.log(db.prepare("SELECT COUNT(*) AS n FROM sales").get().n); db.close();')
+printf '%s\n' "$sales"
+test "$sales" = 75
+
+echo 'Si todos los pasos terminan sin error: despliegue verificado.'
+
+IMPORTANTE
+----------
+- El bloque usa un directorio de release nuevo y el .env original; no extrae archivos sobre el stack anterior.
+- Compose conserva el proyecto creaciones-melvin y reutiliza el volumen nombrado sales-data.
+- El stack original, .env, data, backups y rollback.sh se dejan intactos.
+- Si un comando falla, no sigas con los siguientes ni borres nada. Conservá el mensaje exacto del error.
+- El rollback documentado está en /home/operator1/stacks/creaciones-melvin/rollback.sh.

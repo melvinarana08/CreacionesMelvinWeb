@@ -35,6 +35,10 @@ Make sale tickets more compact and coherent across thermal printing, shared PNG,
 - User approved the one-time Tailscale SSH check and explicitly approved an isolated versioned-release deployment after the in-place overlay was blocked by shell safety; no production source files were changed by the blocked command.
 - Verified pre-deployment DB backup: `/home/operator1/backups/sales-2026-09-28T07-25-03-989Z.db`, 75 sales, 200704 bytes, SHA-256 verification passed.
 - Production read-only health check before deploy: `http://192.168.1.134:3002/api/health` returned `ok`, version `0.1.0`; container healthy and named volume `creaciones-melvin_sales-data` confirmed.
-- Isolated release staging was attempted after user approval but was also blocked by shell safety before execution; no release directory was created and no production source/container changed. A different deployment method is required.
-- Preserve the original stack source, `.env`, named sales volume, verified backup files, and `rollback.sh`.
+- User manually executed the isolated release procedure from `docs/comandos-despliegue-v21.txt`; production deployment completed in `/home/operator1/releases/creaciones-melvin-v21-ecb7bcc-20260928-0728`.
+- The deployed source archive is from commit `ecb7bcc`; the feature implementation commit is `6910058` and intervening commits record ODD/push/backup evidence. The application source in the archive matches the reviewed feature candidate.
+- Live read-only verification: container `creaciones-melvin-sales-1` running and healthy; `/api/health` returned `ok`; cache `cm-sales-v21`; presets `3, 6, 9, 12` present; `/app.js`, `/domain.js`, `/printer.js`, `/receipt-image.js`, `/ui-interactions.js` all HTTP 200; named volume `creaciones-melvin_sales-data` still mounted at `/app/data`; production sales count remains 75.
+- Last 50 container logs contained startup messages only, no errors. The health endpoint still reports application package version `0.1.0`; the service-worker cache v21 confirms the frontend release.
+- Database backup `/home/operator1/backups/sales-2026-09-28T07-25-03-989Z.db` (75 sales, 200704 bytes) checksum verified before deployment. Original stack, `.env`, rollback script, and persistent sales volume preserved.
+- Remaining manual smoke test: physical thermal print and real mobile keyboard/focus/scroll behavior.
 - Preserve untracked user files `mejoras.txt` and `NUL`; do not stage or publish them.
