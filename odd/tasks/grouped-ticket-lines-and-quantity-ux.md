@@ -35,5 +35,6 @@ Make sale tickets more compact and coherent across thermal printing, shared PNG,
 - User approved the one-time Tailscale SSH check and explicitly approved an isolated versioned-release deployment after the in-place overlay was blocked by shell safety; no production source files were changed by the blocked command.
 - Verified pre-deployment DB backup: `/home/operator1/backups/sales-2026-09-28T07-25-03-989Z.db`, 75 sales, 200704 bytes, SHA-256 verification passed.
 - Production read-only health check before deploy: `http://192.168.1.134:3002/api/health` returned `ok`, version `0.1.0`; container healthy and named volume `creaciones-melvin_sales-data` confirmed.
-- Isolated deployment and live checks are in progress; preserve the original stack source, `.env`, named sales volume, backup files, and `rollback.sh`.
+- Isolated release staging was attempted after user approval but was also blocked by shell safety before execution; no release directory was created and no production source/container changed. A different deployment method is required.
+- Preserve the original stack source, `.env`, named sales volume, verified backup files, and `rollback.sh`.
 - Preserve untracked user files `mejoras.txt` and `NUL`; do not stage or publish them.
