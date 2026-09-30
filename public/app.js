@@ -11,6 +11,8 @@ import { createReceiptPngFile, receiptImageFilename } from './receipt-image.js';
 import {
   applySelectedCustomer,
   downloadFileWithObjectUrl,
+  runPendingSync,
+  syncResultMessage,
   filterCustomerSuggestions,
   performShare,
   shouldDismissCustomerSuggestions,
@@ -139,7 +141,7 @@ function renderCart() {
     $('saveAsEncargoBtn').hidden = Boolean(state.correction);
   }
   $('cancelSaleCorrectionBtn').hidden = !state.correction;
-  $('finishBtn').textContent = state.correction ? 'Guardar corrección' : 'Finalizar venta';
+  $('finishBtnLabel').textContent = state.correction ? 'Guardar corrección' : 'Finalizar venta';
 
   $('finishBtn').disabled = state.cart.length === 0 || !discountValid.ok;
   $('saveAsEncargoBtn').disabled = state.cart.length === 0;
@@ -319,37 +321,60 @@ function askSellerToken() {
   return null;
 }
 
+let syncing = false;
+let retryAfterSync = false;
+
+function showSyncStatus(message, type) {
+  const node = $('syncStatus');
+  node.textContent = message;
+  node.className = `sync-status ${type || ''}`;
+}
+
 async function syncAll() {
-  let records = [];
+  if (syncing) { retryAfterSync = true; return; }
+  syncing = true;
+  const button = $('syncBtn');
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  showSyncStatus('Revisando ventas pendientes…', 'saving');
   try {
-    records = await S.listPendingSales();
-  } catch (e) {
-    console.error('No se pudo leer la cola local:', e);
-    return;
-  }
-  for (const rec of records) {
-    if (rec.status !== 'pending') continue;
-    let sellerToken = S.hasSellerToken() ? S.getSellerToken() : null;
-    let res = await Api.postSale(rec.payload, sellerToken);
-    if (!res.ok && res.error && res.error.code === 'seller_token_required') {
-      const token = askSellerToken();
-      if (!token) { state.online = false; continue; }
-      res = await Api.postSale(rec.payload, token);
+    const records = await S.listPendingSales();
+    const outcome = await runPendingSync({
+      records,
+      postSale: Api.postSale,
+      markSynced: S.markSynced,
+      markConflict: S.markConflict,
+      getSellerToken: () => S.hasSellerToken() ? S.getSellerToken() : null,
+      askSellerToken,
+      onProgress: (index, total) => showSyncStatus(`Sincronizando ${index} de ${total}…`, 'saving'),
+      onSynced: (rec, sale) => {
+        if (state.receipt && state.receipt.id === rec.id && !state.receipt.folio) {
+          state.receipt.folio = sale.folio;
+          renderReceipt();
+        }
+      },
+      onConflict: (rec) => alert(`⚠️ La venta ${rec.id.slice(0, 8)} no se pudo enviar: el precio cambió. Revísala en la administración (pendiente de resolver).`),
+    });
+    const current = await S.listPendingSales();
+    state.pendingCount = current.filter((rec) => rec.status === 'pending').length;
+    const conflicts = current.filter((rec) => rec.status === 'conflict').length;
+    if (outcome.networkFailed) state.online = false;
+    else if (outcome.sent) state.online = true;
+    renderStatus();
+    const result = syncResultMessage(outcome, state.pendingCount, conflicts, outcome.networkFailed || (!navigator.onLine && !outcome.sent));
+    showSyncStatus(result.text, result.type);
+  } catch (error) {
+    console.error('No se pudo leer o actualizar la cola local:', error);
+    showSyncStatus('No se pudo revisar la cola local. Las ventas guardadas se conservan; reintentá.', 'failure');
+  } finally {
+    syncing = false;
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    if (retryAfterSync) {
+      retryAfterSync = false;
+      syncAll();
     }
-    if (res.ok) {
-      await S.markSynced(rec.id, res.data.sale);
-      if (state.receipt && state.receipt.id === rec.id && !state.receipt.folio) {
-        state.receipt.folio = res.data.sale.folio;
-        renderReceipt();
-      }
-    } else if (res.error && res.error.code === 'price_changed') {
-      await S.markConflict(rec.id, res.error.message);
-      alert(`⚠️ La venta ${rec.id.slice(0, 8)} no se pudo enviar: el precio cambió. Revísala en la administración (pendiente de resolver).`);
-    } else {
-      state.online = false; // red caída o error transitorio: se reintenta luego
-    }
   }
-  await refreshPendingCount();
 }
 
 // ---------------- Flujo de venta ----------------
@@ -1834,13 +1859,14 @@ async function loadCatalog() {
 const THEME_COLORS = Object.freeze({ light: '#0f766e', dark: '#0f172a', eink: '#ffffff' });
 const THEME_ORDER = ['light', 'dark', 'eink'];
 const THEME_LABELS = Object.freeze({ light: 'Claro', dark: 'Noche', eink: 'E-ink' });
+const THEME_SYMBOLS = Object.freeze({ light: '☀️', dark: '🌙', eink: '📄' });
 
 function applyTheme(theme) {
   const selectedTheme = Object.hasOwn(THEME_COLORS, theme) ? theme : 'light';
   const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(selectedTheme) + 1) % THEME_ORDER.length];
   document.documentElement.dataset.theme = selectedTheme;
   document.documentElement.classList.toggle('eink-mode', selectedTheme === 'eink');
-  $('themeButton').textContent = `Tema: ${THEME_LABELS[selectedTheme]}`;
+  $('themeButton').textContent = THEME_SYMBOLS[selectedTheme];
   $('themeButton').setAttribute('aria-label', `Tema actual: ${THEME_LABELS[selectedTheme]}. Cambiar a ${THEME_LABELS[nextTheme]}`);
   $('themeStatus').textContent = `Tema activo: ${THEME_LABELS[selectedTheme]}`;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[selectedTheme]);
@@ -1990,7 +2016,7 @@ async function init() {
     btn.textContent = isPassword ? '🙈' : '👁️';
   });
   $('themeButton').addEventListener('click', cycleTheme);
-  $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
+  $('syncBtn').addEventListener('click', () => syncAll());
   $('pricesBtn').addEventListener('click', openPricesDialog);
   $('pricesFilter').addEventListener('change', renderPricesList);
   $('closePricesBtn').addEventListener('click', () => $('pricesDialog').close());
@@ -2150,7 +2176,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v22';
+  const swVersion = 'v23';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

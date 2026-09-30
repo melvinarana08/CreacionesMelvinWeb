@@ -150,13 +150,17 @@ h3 { font-size: .95rem; }
 }
 
 .status-bar { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; font-size: .8rem; min-width: 0; }
-.theme-control { min-height: 44px; font-weight: 700; white-space: nowrap; }
+.status-bar .theme-control { min-width: 44px; min-height: 44px; padding: .4rem; font-size: 1.1rem; line-height: 1; background: transparent; color: inherit; border-color: currentColor; white-space: nowrap; }
+.eink-mode .theme-control { filter: grayscale(1); }
 .app-header .theme-control:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .eink-mode .app-header .theme-control:focus-visible { outline-color: #000; }
 .theme-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sync-status:not(:empty) { flex-basis: 100%; text-align: right; font-weight: 600; }
+.sync-status { color: inherit; }
 @media (max-width: 600px) {
   .app-header { flex-wrap: wrap; }
   .status-bar { width: 100%; justify-content: flex-start; }
+  .sync-status:not(:empty) { text-align: left; }
 }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; }
 .dot-on { background: var(--ok); }

@@ -56,7 +56,9 @@ test('línea manual normaliza talla, valida precio y serializa solo la excepció
 
 test('vista previa y ajuste de línea conservan precio, respetan 1–99 y recalculan importes', () => {
   assert.equal(D.formatAddPreview('Pant.', null, 6), 'Elegí una talla para agregar');
-  assert.equal(D.formatAddPreview('Pant.', 4, 6), 'Pant. 4 # 6');
+  assert.equal(D.formatAddPreview('', 4, 6), 'Elegí una talla para agregar');
+  assert.equal(D.formatAddPreview('Pant.', 4, 6), 'Pant. 6 # 4');
+  assert.equal(D.formatAddPreview('Chaleco', 'XL', 2), 'Chaleco 2 # XL');
   const line = { product: 'Pant.', size: 4, quantity: 2, unitPriceCents: 1250, customPrice: true };
   const raised = D.changeLineQuantity(line, 1);
   assert.equal(D.computeSubtotal([raised]), 3750);

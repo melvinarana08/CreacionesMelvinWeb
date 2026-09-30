@@ -20,9 +20,10 @@
       <span class="dot" id="connDot" aria-hidden="true"></span>
       <span id="connText" role="status">Conectando…</span>
       <span class="pending-badge" id="pendingBadge" hidden></span>
-      <button type="button" id="themeButton" class="btn btn-small theme-control" aria-label="Tema actual: Claro. Cambiar a Noche">Tema: Claro</button>
+      <button type="button" id="themeButton" class="btn btn-small theme-control" aria-label="Tema actual: Claro. Cambiar a Noche">☀️</button>
       <span id="themeStatus" class="theme-status" role="status" aria-live="polite" aria-atomic="true"></span>
-      <button type="button" id="syncBtn" class="btn btn-small">Sincronizar</button>
+      <button type="button" id="syncBtn" class="btn btn-small" aria-describedby="syncStatus"><span aria-hidden="true">↻</span> Sincronizar</button>
+      <span id="syncStatus" class="sync-status" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </header>
 
@@ -71,7 +72,7 @@
         <p id="sizeGuidance" class="size-guidance" role="status" aria-live="polite" hidden>Elegí una talla antes de agregar.</p>
         <div class="picker-add-row">
           <span id="addLinePreview" class="add-line-preview" role="status" aria-live="polite">Elegí una talla para agregar</span>
-          <button type="button" id="addLineBtn" class="btn btn-primary">Agregar</button>
+          <button type="button" id="addLineBtn" class="btn btn-primary"><span aria-hidden="true">＋</span> Agregar</button>
         </div>
       </div>
     </section>
@@ -110,7 +111,7 @@
         </div>
         <p id="cartError" class="error-text" role="alert" hidden></p>
         <div class="cart-buttons-group">
-          <button type="button" id="finishBtn" class="btn btn-primary btn-big">Finalizar venta</button>
+          <button type="button" id="finishBtn" class="btn btn-primary btn-big"><span aria-hidden="true">✓</span> <span id="finishBtnLabel">Finalizar venta</span></button>
           <button type="button" id="saveAsEncargoBtn" class="btn btn-encargo btn-big">📦 Guardar como Encargo</button>
         </div>
       </div>

@@ -34,7 +34,7 @@ export function parseSalePriceInput(text) {
 }
 
 export function formatAddPreview(product, size, quantity) {
-  return product && size !== null ? `${product} ${size} # ${quantity}` : 'Elegí una talla para agregar';
+  return product && size !== null ? `${product} ${quantity} # ${size}` : 'Elegí una talla para agregar';
 }
 
 /** Ajusta una línea sin mutarla ni sobrepasar el límite de 1–99. */

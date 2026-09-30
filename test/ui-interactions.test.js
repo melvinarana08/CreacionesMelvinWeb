@@ -7,11 +7,97 @@ import {
   downloadFileWithObjectUrl,
   filterCustomerSuggestions,
   performShare,
+  runPendingSync,
+  syncResultMessage,
   shouldDismissCustomerSuggestions,
   shouldShowCustomerSuggestions,
   updateQuantityControls,
   updateSizeChipSelection,
 } from '../public/ui-interactions.js';
+
+test('sync queue sends only pending records and reports durable outcomes and progress', async () => {
+  const rows = [
+    { id: 'ok', status: 'pending', payload: { id: 'ok' } },
+    { id: 'conflict', status: 'pending', payload: { id: 'conflict' } },
+    { id: 'retry', status: 'pending', payload: { id: 'retry' } },
+    { id: 'already', status: 'synced' },
+  ];
+  const calls = [];
+  const outcome = await runPendingSync({
+    records: rows,
+    getSellerToken: () => 'existing',
+    askSellerToken: () => { throw new Error('unexpected token prompt'); },
+    postSale: async (payload, token) => {
+      calls.push(['post', payload.id, token]);
+      if (payload.id === 'ok') return { ok: true, data: { sale: { id: payload.id, folio: 8 } } };
+      if (payload.id === 'conflict') return { ok: false, error: { code: 'price_changed', message: 'new price' } };
+      return { ok: false, networkError: true, error: { code: 'network' } };
+    },
+    markSynced: async (id) => { rows.find((row) => row.id === id).status = 'synced'; },
+    markConflict: async (id) => { rows.find((row) => row.id === id).status = 'conflict'; },
+    onProgress: (index, total) => calls.push(['progress', index, total]),
+  });
+  assert.deepEqual(outcome, { total: 3, sent: 1, conflicted: 1, failed: 1, tokenRequired: 0, networkFailed: true });
+  assert.deepEqual(calls.filter(([kind]) => kind === 'progress'), [['progress', 1, 3], ['progress', 2, 3], ['progress', 3, 3]]);
+  assert.equal(calls.filter(([kind]) => kind === 'post').length, 3);
+  assert.equal(rows.find((row) => row.id === 'ok').status, 'synced');
+  assert.equal(rows.find((row) => row.id === 'retry').status, 'pending');
+  assert.match(syncResultMessage(outcome, 1, 1, true).text, /1 enviada.*1 pendiente.*1 en conflicto.*1 sin enviar.*Sin conexión/);
+});
+
+test('successful response without a sale remains pending and counts as a failure', async () => {
+  const record = { id: 'missing', status: 'pending', payload: { id: 'missing' } };
+  let synced = 0;
+  const outcome = await runPendingSync({
+    records: [record],
+    getSellerToken: () => null,
+    postSale: async () => ({ ok: true, data: {} }),
+    markSynced: async () => { synced++; record.status = 'synced'; },
+  });
+  assert.equal(synced, 0);
+  assert.equal(record.status, 'pending');
+  assert.deepEqual(outcome, { total: 1, sent: 0, conflicted: 0, failed: 1, tokenRequired: 0, networkFailed: false });
+});
+
+test('successful response with a different sale identity remains retryable', async () => {
+  const record = { id: 'original', status: 'pending', payload: { id: 'original' } };
+  let synced = 0;
+  const outcome = await runPendingSync({
+    records: [record],
+    getSellerToken: () => null,
+    postSale: async () => ({ ok: true, data: { sale: { id: 'other', folio: 9 } } }),
+    markSynced: async () => { synced++; record.status = 'synced'; },
+  });
+  assert.equal(synced, 0);
+  assert.equal(record.status, 'pending');
+  assert.equal(outcome.sent, 0);
+  assert.equal(outcome.failed, 1);
+});
+
+test('token retry and transient errors keep failed sales pending; empty and completed results differ', async () => {
+  const rows = [{ id: 'token', status: 'pending', payload: { id: 'token' } }, { id: 'error', status: 'pending', payload: { id: 'error' } }];
+  const tokens = [];
+  const result = await runPendingSync({
+    records: rows,
+    getSellerToken: () => null,
+    askSellerToken: () => 'seller',
+    postSale: async (payload, token) => {
+      tokens.push(token);
+      if (payload.id === 'error') throw new Error('temporary');
+      return token ? { ok: true, data: { sale: { id: payload.id, folio: 9 } } } : { ok: false, error: { code: 'seller_token_required' } };
+    },
+    markSynced: async (id) => { rows.find((row) => row.id === id).status = 'synced'; },
+    markConflict: async () => {},
+  });
+  assert.deepEqual(tokens, [null, 'seller', null]);
+  assert.equal(result.sent, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(rows[1].status, 'pending');
+  assert.equal(syncResultMessage({ total: 0, sent: 0 }, 0, 0, false).text, 'No hay ventas pendientes.');
+  assert.equal(syncResultMessage({ total: 1, sent: 1 }, 0, 0, false).type, 'success');
+  assert.match(syncResultMessage({ total: 1, sent: 0, failed: 0, tokenRequired: 1 }, 1, 0, false).text, /token de vendedor/);
+  assert.match(syncResultMessage({ total: 1, sent: 0, failed: 0, tokenRequired: 0 }, 1, 0, true).text, /Sin conexión/);
+});
 
 function fakeChip(name, quantity) {
   const classes = new Set(['btn']);

@@ -1,6 +1,61 @@
 // ui-interactions.js — interacciones pequeñas y testeables sin depender del DOM global.
 'use strict';
 
+/** Sends only pending records; failures stay in IndexedDB for a later retry. */
+export async function runPendingSync({ records, postSale, markSynced, markConflict, getSellerToken, askSellerToken, onSynced, onConflict, onProgress }) {
+  const pending = records.filter((record) => record.status === 'pending');
+  const outcome = { total: pending.length, sent: 0, conflicted: 0, failed: 0, tokenRequired: 0, networkFailed: false };
+  for (const [index, record] of pending.entries()) {
+    onProgress?.(index + 1, pending.length);
+    try {
+      let result = await postSale(record.payload, getSellerToken());
+      if (!result.ok && result.error?.code === 'seller_token_required') {
+        const token = askSellerToken();
+        if (!token) { outcome.tokenRequired++; continue; }
+        result = await postSale(record.payload, token);
+      }
+      if (result.ok) {
+        const sale = result.data?.sale;
+        // The server returns { sale: { id, folio, ... } }; only that sale can confirm this UUID.
+        if (typeof record.id !== 'string' || !record.id || record.payload?.id !== record.id
+          || !sale || typeof sale !== 'object' || Array.isArray(sale)
+          || sale.id !== record.id || !Number.isSafeInteger(sale.folio) || sale.folio < 1) {
+          outcome.failed++;
+          continue;
+        }
+        await markSynced(record.id, sale);
+        outcome.sent++;
+        try { onSynced?.(record, sale); } catch (error) { console.error('No se pudo actualizar el comprobante:', error); }
+      } else if (result.error?.code === 'price_changed') {
+        await markConflict(record.id, result.error.message);
+        outcome.conflicted++;
+        try { onConflict?.(record); } catch (error) { console.error('No se pudo mostrar el conflicto:', error); }
+      } else {
+        outcome.failed++;
+        if (result.networkError) outcome.networkFailed = true;
+      }
+    } catch (error) {
+      console.error('No se pudo sincronizar la venta:', error);
+      outcome.failed++;
+    }
+  }
+  return outcome;
+}
+
+/** Completion text reflects persisted queue state, not just a successful request. */
+export function syncResultMessage(outcome, remaining, conflicts, offline) {
+  const { total, sent, failed, tokenRequired } = outcome;
+  if (!total && !conflicts) return { text: 'No hay ventas pendientes.', type: 'success' };
+  const parts = [];
+  if (sent) parts.push(`${sent} enviada${sent === 1 ? '' : 's'}`);
+  if (remaining) parts.push(`${remaining} pendiente${remaining === 1 ? '' : 's'}`);
+  if (conflicts) parts.push(`${conflicts} en conflicto de precio (revisar en administración)`);
+  if (tokenRequired) parts.push('Se necesita el token de vendedor para reintentar');
+  if (failed) parts.push(`${failed} sin enviar por error; reintentá`);
+  if (offline && remaining) parts.push('Sin conexión; reintentá cuando vuelva');
+  return { text: `${parts.join('. ')}.`, type: remaining || conflicts ? 'failure' : 'success' };
+}
+
 export const MIN_QUANTITY = 1;
 export const MAX_QUANTITY = 99;
 

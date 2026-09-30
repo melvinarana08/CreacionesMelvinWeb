@@ -10,6 +10,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
 const css = readFileSync(path.join(ROOT, 'public', 'styles.css'), 'utf8');
 
+test('sync button remains accessible and announces progress and queue results without overlapping attempts', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(html, /id="syncBtn"[^>]*aria-describedby="syncStatus"[^>]*><span aria-hidden="true">↻<\/span> Sincronizar<\/button>/);
+  assert.match(html, /id="syncStatus"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(css, /\.sync-status:not\(:empty\)/);
+  assert.match(app, /if \(syncing\) \{ retryAfterSync = true; return; \}/);
+  assert.match(app, /button\.disabled = true;[\s\S]*button\.setAttribute\('aria-busy', 'true'\)/);
+  assert.match(app, /finally \{[\s\S]*button\.removeAttribute\('aria-busy'\)/);
+  assert.match(app, /runPendingSync\(/);
+  assert.match(app, /syncResultMessage\(outcome, state\.pendingCount, conflicts/);
+});
+
 test('el feedback de catálogo es visible junto a los botones de guardado', () => {
   const statusAt = html.indexOf('id="catalogStatus"');
   const editorAt = html.indexOf('id="catalogEditor"');
@@ -162,14 +174,15 @@ test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaj
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app están alineados en caché v22 y precargan el shell cambiado', () => {
+test('service worker y app están alineados en caché v23 y precargan el shell cambiado', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v22/);
+  assert.match(sw, /cm-sales-v23/);
+  assert.match(sw, /keys\.filter\(\(k\) => k !== CACHE\).*caches\.delete\(k\)/);
   for (const asset of ['/', '/index.html', '/styles.css', '/app.js']) assert.ok(sw.includes(`'${asset}'`));
   assert.match(sw, /'\/ui-interactions\.js'/);
   assert.match(sw, /'\/receipt-image\.js'/);
-  assert.match(app, /swVersion = 'v22'/);
+  assert.match(app, /swVersion = 'v23'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
   assert.match(app, /from '\.\/receipt-image\.js'/);
 });
@@ -335,8 +348,22 @@ test('login admin tiene frontera de formulario y conserva current-password', () 
   assert.match(app, /adminLogin'\)\.addEventListener\('submit'[\s\S]*event\.preventDefault\(\)/);
 });
 
+test('los botones principales conservan texto accesible junto a iconos decorativos', () => {
+  for (const [id, icon, label] of [
+    ['addLineBtn', '＋', 'Agregar'],
+    ['syncBtn', '↻', 'Sincronizar'],
+    ['finishBtn', '✓', 'Finalizar venta'],
+  ]) {
+    const button = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>(.*?)<\\/button>`))?.[1] || '';
+    assert.match(button, new RegExp(`<span aria-hidden="true">${icon}<\\/span>`));
+    assert.ok(button.includes(label), `${id} must keep its visible label`);
+  }
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  assert.match(app, /finishBtnLabel'\)\.textContent = state\.correction \? 'Guardar corrección' : 'Finalizar venta'/);
+});
+
 test('un botón de tema recorre los tres modos, informa el activo y conserva persistencia e-ink', () => {
-  assert.match(html, /<button[^>]*id="themeButton"[^>]*aria-label="Tema actual: Claro\. Cambiar a Noche"/);
+  assert.match(html, /<button[^>]*id="themeButton"[^>]*aria-label="Tema actual: Claro\. Cambiar a Noche"[^>]*>☀️<\/button>/);
   assert.match(html, /id="themeStatus"[^>]*role="status"[^>]*aria-live="polite"/);
   assert.doesNotMatch(html, /id="themeSelect"/);
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
@@ -344,7 +371,8 @@ test('un botón de tema recorre los tres modos, informa el activo y conserva per
   assert.match(app, /themeButton'\)\.addEventListener\('click', cycleTheme\)/);
   assert.match(app, /contains\('eink-mode'\)\) return/);
   assert.match(css, /:root\[data-theme="dark"\]/);
-  assert.match(css, /\.theme-control[^}]*min-height:\s*44px/);
+  assert.match(css, /\.theme-control[^}]*min-width:\s*44px;\s*min-height:\s*44px/);
+  assert.match(css, /\.eink-mode \.theme-control\s*\{[^}]*filter:\s*grayscale\(1\)/);
   assert.match(css, /\.app-header \.theme-control:focus-visible[^}]*outline:/);
   assert.match(css, /\.eink-mode \.app-header \.theme-control:focus-visible[^}]*outline-color: #000/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*\.status-bar \{ width: 100%/);
@@ -384,16 +412,16 @@ test('un botón de tema recorre los tres modos, informa el activo y conserva per
     ['Noche', 'E-ink', '#ffffff', true],
     ['E-ink', 'Claro', '#0f766e', false],
   ]) {
-    assert.equal(button.textContent, `Tema: ${current}`);
+    assert.equal(button.textContent, { Claro: '☀️', Noche: '🌙', 'E-ink': '📄' }[current]);
     assert.equal(button['aria-label'], `Tema actual: ${current}. Cambiar a ${next}`);
     assert.equal(status.textContent, `Tema activo: ${current}`);
     cycleTheme();
-    assert.equal(button.textContent, `Tema: ${next}`);
+    assert.equal(button.textContent, { Claro: '☀️', Noche: '🌙', 'E-ink': '📄' }[next]);
     assert.equal(meta.content, color);
     assert.equal(classes.has('eink-mode'), eink);
     assert.equal(themeStorage.loadTheme(), document.documentElement.dataset.theme);
     assert.equal(store.getItem('cm_eink_mode'), eink ? 'true' : 'false');
   }
   applyTheme('invalid');
-  assert.equal(button.textContent, 'Tema: Claro');
+  assert.equal(button.textContent, '☀️');
 });
