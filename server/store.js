@@ -396,6 +396,55 @@ export function listClients(db, limit = 50) {
     .map((r) => r.name);
 }
 
+function validateClientName(name) {
+  if (typeof name !== 'string') return null;
+  const clean = name.trim();
+  if (!clean || clean.length > MAX_CLIENT_NAME) return null;
+  return clean;
+}
+
+/**
+ * Renombra un cliente del directorio (edición de error de tipeo).
+ * Solo cambia `name`: created_at y last_used_at se conservan; el historial de
+ * ventas/encargos no se toca (client_name queda como fue registrado).
+ */
+export function renameClient(db, from, to) {
+  const fromName = validateClientName(from);
+  const toName = validateClientName(to);
+  if (!fromName || !toName) {
+    throw new HttpError(400, 'invalid_client_name', `Nombre de cliente inválido (máx ${MAX_CLIENT_NAME} caracteres y no vacío)`);
+  }
+  const source = db.prepare('SELECT name FROM clients WHERE name = ? COLLATE NOCASE LIMIT 1').get(fromName);
+  if (!source) {
+    throw new HttpError(404, 'client_not_found', 'Ese cliente no está en el directorio');
+  }
+  const caseOnly = toName.toLocaleLowerCase('es') === fromName.toLocaleLowerCase('es');
+  if (!caseOnly) {
+    const clash = db
+      .prepare('SELECT 1 FROM clients WHERE name = ? COLLATE NOCASE AND name <> ? COLLATE NOCASE LIMIT 1')
+      .get(toName, source.name);
+    if (clash) {
+      throw new HttpError(409, 'client_name_taken', `Ya existe un cliente guardado con el nombre "${toName}"`);
+    }
+  }
+  db.prepare('UPDATE clients SET name = ? WHERE name = ? COLLATE NOCASE').run(toName, source.name);
+  return toName;
+}
+
+/** Elimina un cliente del directorio por nombre (case-insensitive). No toca ventas ni encargos. */
+export function deleteClient(db, name) {
+  const clean = validateClientName(name);
+  if (!clean) {
+    throw new HttpError(400, 'invalid_client_name', `Nombre de cliente inválido (máx ${MAX_CLIENT_NAME} caracteres y no vacío)`);
+  }
+  const source = db.prepare('SELECT name FROM clients WHERE name = ? COLLATE NOCASE LIMIT 1').get(clean);
+  if (!source) {
+    throw new HttpError(404, 'client_not_found', 'Ese cliente no está en el directorio');
+  }
+  db.prepare('DELETE FROM clients WHERE name = ? COLLATE NOCASE').run(source.name);
+  return source.name;
+}
+
 // ---------- Encargos (Pedidos a futuro) ----------
 
 export function validateEncargoInput(input, catalog = []) {

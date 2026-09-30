@@ -50,6 +50,7 @@ const state = {
   printingKeys: new Set(),
   finalizingSale: false,
   correction: null,
+  customerEditName: null,
 };
 
 // ---------------- Utilidades de render (siempre textContent) ----------------
@@ -1792,11 +1793,162 @@ function renderCustomersList() {
   list.replaceChildren();
   const query = $('customerSearchInput').value.trim();
   const matches = query ? filterCustomerSuggestions(state.clients, query) : state.clients;
+  // Si el cliente en edición desapareció del directorio, cancelar la edición
+  // (el filtro de búsqueda solo oculta la fila, no la descarta).
+  if (state.customerEditName && !state.clients.some((name) => name === state.customerEditName)) {
+    state.customerEditName = null;
+  }
   if (!matches.length) {
     list.append(el('li', 'muted', 'No hay clientes guardados que coincidan.'));
     return;
   }
-  for (const name of matches) list.append(el('li', 'customer-list-item', name));
+  for (const name of matches) {
+    if (state.customerEditName === name) {
+      list.append(renderCustomerEditRow(name));
+    } else {
+      list.append(renderCustomerDisplayRow(name));
+    }
+  }
+}
+
+function renderCustomerDisplayRow(name) {
+  const item = el('li', 'customer-list-item');
+  const label = el('span', 'customer-name', name);
+  const actions = el('div', 'customer-actions');
+  const editBtn = el('button', 'btn btn-small', 'Editar');
+  editBtn.type = 'button';
+  editBtn.setAttribute('aria-label', `Editar ${name}`);
+  editBtn.addEventListener('click', () => startCustomerEdit(name));
+  const deleteBtn = el('button', 'btn btn-small btn-danger-soft', 'Borrar');
+  deleteBtn.type = 'button';
+  deleteBtn.setAttribute('aria-label', `Borrar ${name}`);
+  deleteBtn.addEventListener('click', () => deleteCustomer(name, deleteBtn, editBtn));
+  actions.append(editBtn, deleteBtn);
+  item.append(label, actions);
+  return item;
+}
+
+function renderCustomerEditRow(name) {
+  const item = el('li', 'customer-list-item customer-list-item-editing');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'customer-name-input';
+  input.value = name;
+  input.maxLength = 100;
+  input.setAttribute('aria-label', `Renombrar ${name}`);
+  const actions = el('div', 'customer-actions');
+  const saveBtn = el('button', 'btn btn-small btn-primary', 'Guardar');
+  saveBtn.type = 'button';
+  const cancelBtn = el('button', 'btn btn-small', 'Cancelar');
+  cancelBtn.type = 'button';
+  saveBtn.addEventListener('click', () => commitCustomerEdit(input.value, saveBtn, cancelBtn));
+  cancelBtn.addEventListener('click', cancelCustomerEdit);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitCustomerEdit(input.value, saveBtn, cancelBtn);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelCustomerEdit();
+    }
+  });
+  actions.append(saveBtn, cancelBtn);
+  item.append(input, actions);
+  return item;
+}
+
+function startCustomerEdit(name) {
+  state.customerEditName = name;
+  renderCustomersList();
+  const input = document.querySelector('#customersList .customer-name-input');
+  if (input) input.focus();
+}
+
+function cancelCustomerEdit() {
+  state.customerEditName = null;
+  renderCustomersList();
+}
+
+async function commitCustomerEdit(rawName, saveBtn, cancelBtn) {
+  const oldName = state.customerEditName;
+  if (typeof oldName !== 'string') return;
+  const newName = String(rawName ?? '').trim();
+  if (!newName || newName.length > 100) {
+    showCustomerStatus('Escribí un nombre de hasta 100 caracteres.', 'failure');
+    return;
+  }
+  if (newName === oldName) {
+    state.customerEditName = null;
+    renderCustomersList();
+    return;
+  }
+  saveBtn.disabled = true;
+  cancelBtn.disabled = true;
+  try {
+    const res = await Api.putClient(oldName, newName);
+    if (!res.ok) {
+      if (res.networkError) {
+        showCustomerStatus('Necesitás conexión para editar clientes. Probá de nuevo cuando haya internet.', 'failure');
+      } else if (res.status === 409) {
+        showCustomerStatus(`Ya hay un cliente guardado con el nombre "${newName}". Si es un duplicado, borrá ese cliente en vez de renombrar.`, 'failure');
+      } else if (res.status === 404) {
+        S.forgetClient(oldName);
+        state.customerEditName = null;
+        state.clients = S.loadClients();
+        renderCustomersList();
+        showCustomerStatus('Ese cliente ya no estaba en la lista; lo quité de este dispositivo.', 'failure');
+      } else {
+        showCustomerStatus(res.error?.message || 'No se pudo renombrar el cliente.', 'failure');
+      }
+      return;
+    }
+    S.renameClient(oldName, res.data?.name || newName);
+    state.customerEditName = null;
+    state.clients = S.loadClients();
+    renderCustomersList();
+    showCustomerStatus('Cliente actualizado.', 'success');
+    loadClientsList();
+  } catch {
+    showCustomerStatus('No se pudo renombrar el cliente.', 'failure');
+  } finally {
+    saveBtn.disabled = false;
+    cancelBtn.disabled = false;
+  }
+}
+
+async function deleteCustomer(name, deleteBtn, editBtn) {
+  const confirmed = confirm(`¿Borrar a "${name}" del directorio? Las ventas y encargos ya registrados con ese nombre lo conservan tal cual.`);
+  if (!confirmed) return;
+  deleteBtn.disabled = true;
+  editBtn.disabled = true;
+  try {
+    const res = await Api.deleteClient(name);
+    if (!res.ok) {
+      if (res.networkError) {
+        showCustomerStatus('Necesitás conexión para borrar clientes. Probá de nuevo cuando haya internet.', 'failure');
+      } else if (res.status === 404) {
+        S.forgetClient(name);
+        if (state.customerEditName === name) state.customerEditName = null;
+        state.clients = S.loadClients();
+        renderCustomersList();
+        showCustomerStatus('Ese cliente ya no estaba en la lista; lo quité de este dispositivo.', 'failure');
+      } else {
+        showCustomerStatus(res.error?.message || 'No se pudo borrar el cliente.', 'failure');
+      }
+      return;
+    }
+    S.forgetClient(name);
+    if (state.customerEditName === name) state.customerEditName = null;
+    state.clients = S.loadClients();
+    renderCustomersList();
+    showCustomerStatus('Cliente borrado.', 'success');
+    loadClientsList();
+  } catch {
+    showCustomerStatus('No se pudo borrar el cliente.', 'failure');
+  } finally {
+    deleteBtn.disabled = false;
+    editBtn.disabled = false;
+  }
 }
 
 async function createCustomer(event) {
@@ -2176,7 +2328,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v23';
+  const swVersion = 'v24';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

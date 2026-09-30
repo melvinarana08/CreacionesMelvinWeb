@@ -277,6 +277,50 @@ export function markPrintSuccess(key, timestamp = new Date().toISOString()) {
 }
 
 const LS_CLIENTS = 'cm_clients';
+const MAX_CLIENT_NAME = 100;
+
+/** Coincidencia case-insensitive para el directorio local. */
+function sameClientName(a, b) {
+  return a.toLocaleLowerCase('es') === b.toLocaleLowerCase('es');
+}
+
+/** Quita el cliente del directorio local por nombre, sin alterar el orden del resto. */
+export function forgetClient(name) {
+  if (typeof name !== 'string') return false;
+  const clean = name.trim();
+  if (!clean || clean.length > MAX_CLIENT_NAME) return false;
+  const list = loadClients();
+  const next = list.filter((c) => !sameClientName(c, clean));
+  if (next.length === list.length) return false;
+  saveClients(next);
+  return true;
+}
+
+/**
+ * Reemplaza un nombre en su misma posición (case-insensitive), evitando duplicados.
+ * Ignora entradas inválidas y nombres ausentes del directorio.
+ */
+export function renameClient(oldName, newName) {
+  if (typeof oldName !== 'string' || typeof newName !== 'string') return false;
+  const oldClean = oldName.trim();
+  const newClean = newName.trim();
+  if (!oldClean || oldClean.length > MAX_CLIENT_NAME) return false;
+  if (!newClean || newClean.length > MAX_CLIENT_NAME) return false;
+  const list = loadClients();
+  const index = list.findIndex((c) => sameClientName(c, oldClean));
+  if (index === -1) return false;
+  const mergeTarget = list.some((c, i) => i !== index && sameClientName(c, newClean));
+  let next;
+  if (mergeTarget) {
+    // El nombre destino ya existe: el duplicado se elimina y sobrevive el existente.
+    next = list.filter((c, i) => i !== index);
+  } else {
+    next = list.slice();
+    next[index] = newClean;
+  }
+  saveClients(next);
+  return true;
+}
 
 export function loadClients() {
   try {

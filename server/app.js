@@ -25,6 +25,8 @@ import {
   listAudit,
   listClients,
   upsertClient,
+  renameClient,
+  deleteClient,
   createEncargo,
   getEncargo,
   listEncargos,
@@ -259,6 +261,18 @@ export function createApp(opts) {
       const name = upsertClient(db, body?.name);
       if (!name) throw new HttpError(400, 'invalid_client_name', 'Nombre de cliente inválido');
       return sendJson(res, 201, { name });
+    }
+
+    if (method === 'PUT' && pathname === '/api/clients') {
+      const body = await readJsonBody(req);
+      const name = renameClient(db, body?.from, body?.to);
+      return sendJson(res, 200, { name });
+    }
+
+    if (method === 'DELETE' && pathname === '/api/clients') {
+      const name = url.searchParams.get('name');
+      const deleted = deleteClient(db, name);
+      return sendJson(res, 200, { name: deleted });
     }
 
     // ---- Encargos (Pedidos a futuro) ----

@@ -60,6 +60,8 @@ export const adminAudit = (csrf, limit = 100) =>
 // Clientes y Encargos
 export const fetchClients = () => apiFetch('/api/clients');
 export const postClient = (name) => apiFetch('/api/clients', { method: 'POST', body: { name } });
+export const putClient = (from, to) => apiFetch('/api/clients', { method: 'PUT', body: { from, to } });
+export const deleteClient = (name) => apiFetch(`/api/clients?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
 
 export const fetchEncargos = (sellerToken, status = 'pending') =>
   apiFetch(`/api/encargos?status=${encodeURIComponent(status)}`, { sellerToken });

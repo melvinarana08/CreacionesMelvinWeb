@@ -667,7 +667,24 @@ select:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 .customer-form input, #customerSearchInput { width: 100%; text-align: left; min-height: 44px; }
 .customer-form .btn { justify-self: start; min-height: 44px; }
 .customers-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .4rem; }
-.customer-list-item { padding: .7rem; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.customer-list-item {
+  padding: .7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.customer-list-item .customer-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.customer-list-item .customer-actions { display: flex; gap: .4rem; flex: 0 0 auto; }
+.customer-list-item .customer-actions .btn { min-height: 44px; min-width: 44px; }
+.customer-list-item-editing { flex-wrap: wrap; }
+.customer-name-input { flex: 1 1 auto; min-width: 0; max-width: 100%; min-height: 44px; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; text-align: left; }
+@media (max-width: 480px) {
+  .customer-list-item { flex-wrap: wrap; }
+  .customer-list-item .customer-actions { flex: 1 1 100%; justify-content: flex-end; }
+}
 
 /* Vista de Encargos */
 .encargos-view {

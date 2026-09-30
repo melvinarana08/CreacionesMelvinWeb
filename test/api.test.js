@@ -413,3 +413,121 @@ test('body JSON malformado y content-type incorrecto → 400', async (t) => {
   const res2 = await fetch(ctx.base + '/api/sales', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'hola' });
   assert.equal(res2.status, 415);
 });
+
+// ---- Clientes: renombrar y borrar (CDE-1) ----
+
+test('PUT /api/clients renombra un cliente y conserva created_at/last_used_at', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Doña Ana  ' } });
+
+  const before = ctx.db.prepare('SELECT name, created_at, last_used_at FROM clients').get();
+  const r = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'Doña Ana', to: '  Ana López  ' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data, { name: 'Ana López' });
+  const after = ctx.db.prepare('SELECT name, created_at, last_used_at FROM clients').get();
+  assert.equal(after.name, 'Ana López');
+  assert.equal(after.created_at, before.created_at);
+  assert.equal(after.last_used_at, before.last_used_at);
+  assert.equal(ctx.db.prepare('SELECT COUNT(*) AS n FROM clients').get().n, 1);
+});
+
+test('PUT /api/clients acepta renombrar solo mayúsculas del mismo cliente', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'ana lopez' } });
+  const r = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'ana lopez', to: 'Ana Lopez' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data, { name: 'Ana Lopez' });
+});
+
+test('PUT /api/clients rechaza colisión con otro cliente → 409 client_name_taken', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Ana' } });
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Beto' } });
+  const r = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'Ana', to: 'beto' } });
+  assert.equal(r.status, 409);
+  assert.equal(r.data.error.code, 'client_name_taken');
+  // El mismo nombre en otra capitalización tampoco colisiona consigo mismo
+  const ok = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'Ana', to: 'ANA' } });
+  assert.equal(ok.status, 200);
+});
+
+test('PUT /api/clients con origen inexistente → 404 client_not_found', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Ana' } });
+  const r = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'No Existe', to: 'Otro' } });
+  assert.equal(r.status, 404);
+  assert.equal(r.data.error.code, 'client_not_found');
+});
+
+test('PUT /api/clients valida nombres inválidos → 400 invalid_client_name', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Ana' } });
+  for (const body of [
+    { from: '', to: 'Ana2' },
+    { from: '   ', to: 'Ana2' },
+    { from: 'Ana', to: '' },
+    { from: 'Ana', to: 'x'.repeat(101) },
+    { from: 42, to: 'Ana2' },
+    { from: 'Ana', to: 42 },
+  ]) {
+    const r = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body });
+    assert.equal(r.status, 400, JSON.stringify(body));
+    assert.equal(r.data.error.code, 'invalid_client_name');
+  }
+});
+
+test('DELETE /api/clients borra por nombre case-insensitive y devuelto tal como está guardado', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/clients', { method: 'POST', body: { name: 'Doña Ana' } });
+  const r = await jsonFetch(ctx.base, `/api/clients?name=${encodeURIComponent('doña ana')}`, { method: 'DELETE' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data, { name: 'Doña Ana' });
+  assert.equal(ctx.db.prepare('SELECT COUNT(*) AS n FROM clients').get().n, 0);
+});
+
+test('DELETE /api/clients con cliente inexistente → 404 client_not_found', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  const r = await jsonFetch(ctx.base, `/api/clients?name=${encodeURIComponent('Nadie')}`, { method: 'DELETE' });
+  assert.equal(r.status, 404);
+  assert.equal(r.data.error.code, 'client_not_found');
+});
+
+test('renombrar o borrar un cliente no toca ventas ni encargos registrados', async (t) => {
+  const ctx = await startServer();
+  t.after(ctx.close);
+  await jsonFetch(ctx.base, '/api/sales', {
+    method: 'POST',
+    body: { ...salePayload(), clientName: 'Cliente Histórico' },
+  });
+  await jsonFetch(ctx.base, '/api/encargos', {
+    method: 'POST',
+    body: {
+      id: UUID2,
+      deviceId: 'dev-test-1',
+      clientName: 'Cliente Histórico',
+      items: [{ productName: 'Short', size: 10, quantity: 1, unitPriceCents: 650 }],
+      totalCents: 650,
+    },
+  });
+
+  const ren = await jsonFetch(ctx.base, '/api/clients', { method: 'PUT', body: { from: 'Cliente Histórico', to: 'Cliente Corregido' } });
+  assert.equal(ren.status, 200);
+  const saleAfterRename = ctx.db.prepare('SELECT client_name FROM sales WHERE id = ?').get(UUID1);
+  const encargoAfterRename = ctx.db.prepare('SELECT e.client_name FROM encargos e WHERE e.id = ?').get(UUID2);
+  assert.equal(saleAfterRename.client_name, 'Cliente Histórico');
+  assert.equal(encargoAfterRename.client_name, 'Cliente Histórico');
+
+  const del = await jsonFetch(ctx.base, `/api/clients?name=${encodeURIComponent('Cliente Corregido')}`, { method: 'DELETE' });
+  assert.equal(del.status, 200);
+  const saleAfterDelete = ctx.db.prepare('SELECT client_name FROM sales WHERE id = ?').get(UUID1);
+  const encargoAfterDelete = ctx.db.prepare('SELECT client_name FROM encargos WHERE id = ?').get(UUID2);
+  assert.equal(saleAfterDelete.client_name, 'Cliente Histórico');
+  assert.equal(encargoAfterDelete.client_name, 'Cliente Histórico');
+});

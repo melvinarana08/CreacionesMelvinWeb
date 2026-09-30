@@ -132,3 +132,45 @@ test('seguimiento de impresión ignora claves inválidas y localStorage dañado'
   assert.equal(S.markPrintSuccess('', '2026-08-24T12:00:00.000Z'), false);
   assert.equal(S.getPrintSuccessAt(''), null);
 });
+
+test('forgetClient elimina el cliente sin distinguir mayúsculas y conserva el orden', () => {
+  S.saveClients(['Ana López', 'Beto', 'Carla']);
+  assert.equal(S.forgetClient('  beto '), true);
+  assert.deepEqual(S.loadClients(), ['Ana López', 'Carla']);
+  assert.equal(S.forgetClient('nadie'), false);
+  assert.deepEqual(S.loadClients(), ['Ana López', 'Carla']);
+});
+
+test('forgetClient ignora nombres inválidos', () => {
+  S.saveClients(['Ana', 'Beto']);
+  assert.equal(S.forgetClient(''), false);
+  assert.equal(S.forgetClient('   '), false);
+  assert.equal(S.forgetClient('x'.repeat(101)), false);
+  assert.equal(S.forgetClient(null), false);
+  assert.deepEqual(S.loadClients(), ['Ana', 'Beto']);
+});
+
+test('renameClient reemplaza en la misma posición, sin distinguir mayúsculas y sin duplicar', () => {
+  S.saveClients(['Ana', 'Beto', 'Carla']);
+  assert.equal(S.renameClient('beto', 'Roberto'), true);
+  assert.deepEqual(S.loadClients(), ['Ana', 'Roberto', 'Carla']);
+  // Renombrar a un nombre que ya existe: se fusiona y queda solo el existente, en su propia posición
+  assert.equal(S.renameClient('Carla', 'ana'), true);
+  assert.deepEqual(S.loadClients(), ['Ana', 'Roberto']);
+});
+
+test('renameClient es case-insensitive en el matching del origen', () => {
+  S.saveClients(['Ana López']);
+  assert.equal(S.renameClient('ana lópez', 'Ana López Gómez'), true);
+  assert.deepEqual(S.loadClients(), ['Ana López Gómez']);
+});
+
+test('renameClient ignora entrada inválida o nombres ausentes', () => {
+  S.saveClients(['Ana', 'Beto']);
+  assert.equal(S.renameClient('', 'Nadie'), false);
+  assert.equal(S.renameClient('Ana', '   '), false);
+  assert.equal(S.renameClient('Ana', 'x'.repeat(101)), false);
+  assert.equal(S.renameClient(null, 'Nadie'), false);
+  assert.equal(S.renameClient('No Existe', 'Nadie'), false);
+  assert.deepEqual(S.loadClients(), ['Ana', 'Beto']);
+});

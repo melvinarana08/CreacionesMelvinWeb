@@ -2,6 +2,25 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 21. Edición y borrado del directorio de clientes
+
+- **Alcance solo directorio:** renombrar o borrar toca exclusivamente la tabla `clients` y la
+  lista local `cm_clients`. Las ventas y encargos ya registrados conservan el texto
+  `client_name` con que se guardó cada venta o pedido; la app nunca reescribe el historial
+  para satisfacer una edición del directorio.
+- **Mutación confirmada por el servidor:** el estado local solo cambia tras una respuesta
+  HTTP exitosa. La API evita parámetros de ruta porque los nombres llevan espacios y
+  acentos: `PUT /api/clients` recibe `{ from, to }` y `DELETE /api/clients?name=` borra por
+  consulta. Un borrado local no autorizado reaparecería al fusionar la lista del servidor,
+  así que sin conexión se informa el problema y no se cambia nada.
+- **Conflicto explícito:** renombrar sobre un nombre ya guardado devuelve 409
+  (`client_name_taken`) en lugar de fusionar silenciosamente; el mensaje invita a borrar el
+  duplicado. Renombrar solo mayúsculas de una misma fila es válido.
+- **Nivel de acceso sin cambios:** las rutas nuevas replican el acceso sin autenticación de
+  `POST /api/clients` y de la vista Clientes; no se agrega ni se relaja autenticación y el
+  riesgo residual queda registrado, sin alterar semánticas de ventas, encargos, sincronización
+  ni administración.
+
 ## 20. Alcance del POS y correcciones auditadas
 
 - **Venta:** talla y precio manuales valen solo para la línea de la venta actual, sin alterar

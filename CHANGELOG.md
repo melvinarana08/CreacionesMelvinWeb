@@ -4,6 +4,13 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 
 ## [Unreleased]
 
+### Directorio de clientes: editar y borrar
+- **Editar** y **Borrar** por cliente en la vista Clientes: renombrar en línea (con Guardar/Cancelar, Enter/Escape y foco en el campo) y borrado con confirmación explícita que informa que las ventas y encargos ya registrados conservan ese nombre.
+- Alcance limitado al directorio: solo cambian la tabla `clients` y la lista local `cm_clients`; el historial de ventas y encargos nunca se reescribe para satisfacer una edición del directorio.
+- Mutaciones confirmadas por el servidor antes de tocar el estado local (`PUT /api/clients` con `{ from, to }` y `DELETE /api/clients?name=`): sin conexión se informa el problema y no se cambia nada; renombrar sobre un nombre ya guardado es un conflicto (409) con mensaje para borrar el duplicado en lugar de mezclar.
+- Mensajes de resultado (actualizado, borrado, sin conexión, cliente ya inexistente) por la región de estado existente de la vista; botones de la fila bloqueados mientras la petición está en curso.
+- Caché PWA actualizada a `cm-sales-v24` para propagar el shell cambiado a los dispositivos instalados.
+
 ### Mejoras del punto de venta
 - Talla y precio manuales por línea solo para la venta actual, vista previa junto a **Agregar** y cantidades ajustables en el carrito con totales actualizados.
 - Corrección administrativa de ventas finalizadas activas con revisiones y snapshots anterior/posterior; las anuladas no admiten cambios. Esquema SQLite v3 y `POST /api/admin/sales/:id/correct` con sesión y CSRF.

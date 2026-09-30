@@ -68,6 +68,70 @@ test('customers view creates names through public API and local cache without al
   assert.doesNotMatch(html, /id="customerPhoneInput"|id="customerAddressInput"/);
 });
 
+test('customers view edits and deletes directory entries with accessible names and confirmed delete', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  const api = readFileSync(path.join(ROOT, 'public', 'api.js'), 'utf8');
+  const storage = readFileSync(path.join(ROOT, 'public', 'storage.js'), 'utf8');
+  const css = readFileSync(path.join(ROOT, 'public', 'styles.css'), 'utf8');
+
+  // Data layer
+  assert.match(api, /export const putClient = \(from, to\) => apiFetch\('\/api\/clients', \{ method: 'PUT', body: \{ from, to \} \}\)/);
+  assert.match(api, /export const deleteClient = \(name\) => apiFetch\(`\/api\/clients\?name=\$\{encodeURIComponent\(name\)\}`, \{ method: 'DELETE' \}\)/);
+  assert.match(storage, /export function forgetClient\(name\)/);
+  assert.match(storage, /export function renameClient\(oldName, newName\)/);
+
+  // Row with accessible Editar/Borrar actions per customer
+  assert.match(app, /setAttribute\('aria-label', `Editar \$\{name\}`\)/);
+  assert.match(app, /setAttribute\('aria-label', `Borrar \$\{name\}`\)/);
+  assert.match(app, /editBtn\.type = 'button'/);
+  assert.match(app, /deleteBtn\.type = 'button'/);
+
+  // Edit flow: inline input, Guardar/Cancelar, Enter/Escape, focus kept across re-renders
+  assert.match(app, /state\.customerEditName/);
+  assert.match(app, /input\.maxLength = 100/);
+  assert.match(app, /Guarden|'Guardar'/);
+  assert.match(app, /'Cancelar'/);
+  assert.match(app, /event\.key === 'Enter'[\s\S]{0,200}commitCustomerEdit/);
+  assert.match(app, /event\.key === 'Escape'/);
+  assert.match(app, /input\.focus\(\)/);
+
+  // Save: server-confirmed only, then local rename
+  assert.match(app, /Api\.putClient\(oldName, newName\)/);
+  assert.match(app, /S\.renameClient\(oldName/);
+  assert.match(app, /success.*Cliente actualizado\.|"Cliente actualizado\."|'Cliente actualizado\.'/);
+  assert.match(app, /duplicado, borrá ese cliente en vez de renombrar/);
+  assert.match(app, /Necesitás conexión para editar clientes/);
+
+  // 404: server confirms the customer is absent, so the stale local entry is dropped
+  assert.match(
+    app,
+    /res\.status === 404\) \{\s*S\.forgetClient\(oldName\);\s*state\.customerEditName = null;\s*state\.clients = S\.loadClients\(\);\s*renderCustomersList\(\);\s*showCustomerStatus\('Ese cliente ya no estaba en la lista; lo quité de este dispositivo\.', 'failure'\)/
+  );
+
+  // Delete: explicit confirmation that sales keep the name, server-first, then local forget
+  assert.match(app, /confirm\([\s\S]*ya registrados con ese nombre lo conservan/);
+  assert.match(app, /Api\.deleteClient\(name\)/);
+  assert.match(app, /S\.forgetClient\(name\)/);
+  assert.match(app, /Necesitás conexión para borrar clientes/);
+  // 404 on delete: same honest cleanup, no ghost name left in cm_clients
+  assert.match(
+    app,
+    /res\.status === 404\) \{\s*S\.forgetClient\(name\);\s*if \(state\.customerEditName === name\) state\.customerEditName = null;\s*state\.clients = S\.loadClients\(\);\s*renderCustomersList\(\);\s*showCustomerStatus\('Ese cliente ya no estaba en la lista; lo quité de este dispositivo\.', 'failure'\)/
+  );
+
+  // In-flight buttons disabled inside try, re-enabled in finally
+  assert.match(app, /[\s\S]*deleteBtn\.disabled = true;/);
+  assert.match(app, /finally \{[\s\S]{0,200}deleteBtn\.disabled = false;/);
+
+  // Status reported through the single existing region
+  assert.match(app, /function showCustomerStatus\(message, type\) \{[\s\S]{0,300}\$\('customerCreateStatus'\)/);
+
+  // Responsive flex rows with 44px touch targets, long names wrap
+  assert.match(css, /\.customer-list-item \{[\s\S]{0,300}display:\s*flex/);
+  assert.match(css, /\.customer-list-item \.customer-actions \.btn \{[^}]*min-height:\s*44px/);
+  assert.match(css, /overflow-wrap:\s*anywhere/);
+});
+
 test('el login verifica que la cookie de sesión quedó activa antes de abrir administración', () => {
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
   assert.match(app, /Api\.adminLogin\(password\)[\s\S]*Api\.adminSession\(\)/);
@@ -174,15 +238,17 @@ test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaj
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app están alineados en caché v23 y precargan el shell cambiado', () => {
+test('service worker y app están alineados en caché v24 y precargan el shell cambiado', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v23/);
+  assert.match(sw, /cm-sales-v24/);
+  assert.doesNotMatch(sw, /cm-sales-v23/);
   assert.match(sw, /keys\.filter\(\(k\) => k !== CACHE\).*caches\.delete\(k\)/);
   for (const asset of ['/', '/index.html', '/styles.css', '/app.js']) assert.ok(sw.includes(`'${asset}'`));
   assert.match(sw, /'\/ui-interactions\.js'/);
   assert.match(sw, /'\/receipt-image\.js'/);
-  assert.match(app, /swVersion = 'v23'/);
+  assert.match(app, /swVersion = 'v24'/);
+  assert.doesNotMatch(app, /swVersion = 'v23'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
   assert.match(app, /from '\.\/receipt-image\.js'/);
 });
