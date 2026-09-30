@@ -48,3 +48,14 @@ Let the operator fix customer typos from the **Clientes** view: rename a saved c
 - Residual, accepted: SQLite `NOCASE` only folds ASCII, so accented case variants are not treated as equal. Real browser interaction and installed-PWA cache activation remain unverified here.
 - Work-unit commit: `b1be0eb759fa040e3affc5ca6959adceb7ceea30` (`feat(pos): rename and delete saved customers`), 13 files, 585 insertions and 7 deletions. Final independent verification passed `npm test` 209/209, `npm run check` and `git diff --check` with no findings.
 - Untracked and deliberately excluded from the commit: `NUL`, `docs/despliegue-v22-manual.md`, `docs/despliegue-v23-manual.md`.
+
+## Deployment v24 (2026-09-30)
+- Target: `gym-node-02` (`root@100.97.20.79`), production `http://192.168.1.134:3002`, Compose project `creaciones-melvin`.
+- Archive `/tmp/creaciones-melvin-v24-1ad9aca.tar.gz` (160,650 bytes) with SHA-256 `76b7e3a94576cb89bed1e8ce0aa86729b8beeda25e7bcefb75fea708a85c451d`, built with `git archive HEAD` and verified on the server.
+- Fresh pre-deploy backup verified by `VACUUM INTO`: `/home/operator1/backups/sales-2026-09-30T23-04-56-156Z.db` (229,376 bytes, schema v3, 89 sales, 27 clients, checksum OK).
+- Release: `/home/operator1/releases/creaciones-melvin-v24-1ad9aca-20260930-1705`; `docker compose config -q` passed before applying.
+- Applied with `docker compose up -d --build`; the v23 container was recreated.
+- Post-deploy verification passed: health `ok`; container `Up (healthy)`; `cm-sales-v24` served; six shell assets HTTP 200; SQLite schema v3 with 89 sales and 27 clients (unchanged); named volume still mounted at `/app/data`.
+- Live endpoint smoke test against production, which left no residue: `POST /api/clients` created a test customer, `PUT /api/clients` renamed it, renaming onto an existing name returned the expected 409, deleting an absent name returned 404, and both test customers were deleted, leaving the client count back at 27.
+- Rollback path: re-run Compose from `/home/operator1/releases/creaciones-melvin-v23-324f0ef-20260930-1626`; the named volume is preserved.
+- Remaining: browser/mobile confirmation of the inline edit and the delete confirmation, and installed-PWA activation of `cm-sales-v23 → v24` on a real device.
