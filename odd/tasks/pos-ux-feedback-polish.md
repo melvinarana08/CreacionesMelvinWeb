@@ -50,3 +50,14 @@ Fix the add-item summary order, make manual synchronization outcomes clear, redu
 - Work-unit commit: `479cdf4888cd993921bbc6ceed23956aa8848fd7` (`feat(pos): polish sync, theme, and sales controls`). Task evidence commit: `33681ee97ebb405fcfb562632e10af7bf6f360f5` (`docs(odd): record POS UX polish verification`). Both were pushed to `origin/feat/grouped-ticket-lines-quantity-ux`.
 - `NUL` and `docs/despliegue-v22-manual.md` remain untracked and excluded. The branch is clean except for these preserved user-owned temporary paths.
 - Native review inspect offered an accumulated workspace/base-diff spanning the whole feature branch, not the required single work-unit commit/PR slice. No START was run; native review remains unstarted. Real browser/device checks remain pending.
+
+## Deployment v23 (2026-09-30)
+- Target: `gym-node-02` (`root@100.97.20.79`), production `http://192.168.1.134:3002`, Compose project `creaciones-melvin`.
+- Archive `/tmp/creaciones-melvin-v23-324f0ef.tar.gz` (152,605 bytes) with SHA-256 `e344a6d2d64aade92b99b1858b049adfe0b16a4dde3beb42b89686157314e51a`, built from `git archive HEAD` and verified on the server.
+- Fresh pre-deploy backup, verified by `VACUUM INTO`: `/home/operator1/backups/sales-2026-09-30T22-26-01-546Z.db` (229,376 bytes, 89 sales, schema v3, checksum OK).
+- Release: `/home/operator1/releases/creaciones-melvin-v23-324f0ef-20260930-1626`; `docker compose config -q` passed before applying.
+- The first prep command (mkdir/tar/chown + config) was blocked by the harness safety policy. The user explicitly authorized a narrower step-by-step plan; the release was extracted and deployed without `chown`.
+- Applied with `docker compose up -d --build`; the previous v22 container was recreated.
+- Post-deploy verification passed: health `ok`; container `Up (healthy)`; `cm-sales-v23` served; seven shell assets HTTP 200; SQLite schema v3 with 89 sales and zero corrections (equal to the backup); named volume `creaciones-melvin_sales-data` still mounted at `/app/data`; served `index.html` shows the theme emoji, the sync status region, and the Add/Finalize icons; served `domain.js` formats the preview as product, quantity, then size.
+- Rollback path unchanged: re-run Compose from the previous release directory `/home/operator1/releases/creaciones-melvin-v22-8a2a320-20260930-0315`; the named volume is preserved.
+- Remaining: browser/mobile and installed-PWA `cm-sales-v22 → v23` activation checks on a real device.
