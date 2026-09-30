@@ -28,7 +28,7 @@ Fix the add-item summary order, make manual synchronization outcomes clear, redu
   - Make the theme button visually subtle and emoji-only while keeping dynamic accessible label/status; choose clear theme-dependent symbols, including monochrome-safe E-ink presentation.
   - Add a small number of helpful icons to primary Add/Sync/Finalize actions only where they aid scanning; retain visible text and accessible names.
   - Check: UI contract tests verify visible label/emoji, accessible names, target size, focus, and theme cycle behavior.
-- [ ] **UXP-4 — Verify and deliver** *(in progress)*
+- [x] **UXP-4 — Verify and deliver** *(verified, committed, and pushed)*
   - Run focused and full tests, syntax and whitespace checks; inspect the combined diff and ensure the deployment helper files remain excluded from commits.
   - Check: `npm test`, `npm run check`, and `git diff --check` pass; commit and push the verified code and non-temporary task evidence to the existing feature branch, excluding `NUL` and deployment helper files.
 
@@ -46,6 +46,7 @@ Fix the add-item summary order, make manual synchronization outcomes clear, redu
 - UXP-3 writer made the theme control emoji-only (☀️/🌙/📄), preserved dynamic accessible names and live announcements, added decorative icons to Add/Sync/Finalize without removing labels, and bumped app/service-worker cache to v23. Focused UI contract tests passed 31/31 and npm/whitespace checks passed. Native assessment remains unassessable due untracked files; independent verification is required.
 - UXP-3 independent verifier found no issues; 31 UI contract tests passed, app/service-worker v23 aligned, visual device/browser check not performed.
 - UXP-4 full independent verification passed `npm test` (195/195), `npm run check`, and `git diff --check`; no actionable findings. Verifier confirmed changed scope and excluded `NUL`/deployment aid from the code diff.
-- Work-unit commit created: `479cdf4888cd993921bbc6ceed23956aa8848fd7` (`feat(pos): polish sync, theme, and sales controls`), on `feat/grouped-ticket-lines-quantity-ux`; includes code, tests, and ODD task records. `NUL` and `docs/despliegue-v22-manual.md` remain untracked and excluded.
-- Native review inspect after commit offered an accumulated workspace/base-diff spanning the whole feature branch, not the required single work-unit commit/PR slice. No START was run; native review remains unstarted.
-- Push is pending. Real browser/device checks remain pending.
+- Full independent verification passed `npm test` (195/195), `npm run check`, and `git diff --check`; no actionable findings.
+- Work-unit commit: `479cdf4888cd993921bbc6ceed23956aa8848fd7` (`feat(pos): polish sync, theme, and sales controls`). Task evidence commit: `33681ee97ebb405fcfb562632e10af7bf6f360f5` (`docs(odd): record POS UX polish verification`). Both were pushed to `origin/feat/grouped-ticket-lines-quantity-ux`.
+- `NUL` and `docs/despliegue-v22-manual.md` remain untracked and excluded. The branch is clean except for these preserved user-owned temporary paths.
+- Native review inspect offered an accumulated workspace/base-diff spanning the whole feature branch, not the required single work-unit commit/PR slice. No START was run; native review remains unstarted. Real browser/device checks remain pending.
