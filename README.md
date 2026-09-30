@@ -22,10 +22,15 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   sin tabla horizontal). Incluye cantidades exactas de un toque **3, 6, 9 y 12**, conserva
   los controles −/+ para ajuste fino entre 1 y 99, y elegir la talla no cambia la cantidad.
   Si se intenta agregar sin talla, aparece una indicación accesible junto al selector, sin popup.
-- Precios **inmutables durante la venta**: cada línea guarda snapshot de nombre/talla/precio.
+  Se puede indicar talla y precio manuales para una línea de esta venta, sin modificar el catálogo;
+  junto a **Agregar** aparece una vista previa de producto, talla y cantidad. El carrito permite
+  ajustar la cantidad de cada línea con −/+ y recalcula los totales.
+- Cada línea guarda el precio y la talla cobrados como snapshot; las correcciones posteriores
+  de ventas activas conservan el historial anterior.
 - **Cliente (opcional):** campo de texto libre con teclado móvil, sugerencias inline de
-  hasta ocho nombres recientes y un directorio completo separado. Las sugerencias filtran
-  por subcadena al escribir; al elegir una, se cierran los selectores sin devolver el foco
+  hasta ocho nombres guardados y un directorio separado donde se pueden guardar clientes
+  manualmente por nombre. Las sugerencias priorizan coincidencias exactas, por prefijo y
+  subcadena, y toleran errores de escritura acotados; al elegir una, se cierran los selectores sin devolver el foco
   al teclado, se anuncia el nombre y la vista baja hasta Finalizar venta. `autocomplete="off"` y un nombre específico de venta reducen falsos
   avisos de credenciales en Chrome, pero sus heurísticas no se pueden controlar por completo.
   Si queda vacío o contiene solo espacios, la app pide confirmación antes de finalizar.
@@ -58,7 +63,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   válido se conserva en el dispositivo, se muestra el comprobante y luego se sincroniza.
   UUID idempotente con fallback para HTTP LAN: reenviar la misma venta no la duplica.
 - Indicador en línea/sin conexión + contador de pendientes + botón de sincronización.
-- Selector persistido de **Tema** con **Claro**, **Noche** y **E-ink**. Noche ofrece una
+- Un solo botón de **Tema** recorre **Claro → Noche → E-ink** y muestra el modo activo;
+  la preferencia se conserva. Noche ofrece una
   presentación oscura coloreada y legible; E-ink conserva blanco/negro, bordes sólidos,
   estados no dependientes del color, sin movimiento ni vibración. La preferencia e-ink
   anterior se migra automáticamente y la interfaz sigue honrando `prefers-reduced-motion`
@@ -72,9 +78,12 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
   fallidas no quedan marcadas como impresas.
 
 ### Administración (protegida con contraseña)
+- Menú lateral adaptable para navegar entre ventas, encargos, clientes y administración.
 - Listar ventas (activas/anuladas/todas) y abrir su detalle para reimprimir el ticket
   sincronizado por Bluetooth; esta reimpresión requiere sesión administrativa.
-- **Anular** ventas con motivo obligatorio (nunca editar/eliminar una venta finalizada).
+- **Corregir** únicamente ventas finalizadas activas desde su detalle: guarda revisiones con
+  fecha y snapshots anterior/posterior. Las ventas anuladas son terminales y no se editan.
+- **Anular** ventas con motivo obligatorio; no se eliminan ventas.
 - **Editar catálogo** con UI estructurada (tarjetas por producto y fila por talla):
   actualizar precios y agregar productos nuevos desde el panel.
 - Al crear un producto se eligen tallas numéricas **1–20**, tallas en letras
@@ -85,7 +94,8 @@ Aplicación web móvil (PWA offline-first) para registrar ventas de ropa por tal
 ### Datos de cada venta
 UUID idempotente, folio central secuencial, timestamps cliente y servidor, subtotal,
 descuento, total, cliente opcional, `deviceId`, estado (`active`/`voided`), y en anulaciones
-motivo y fecha (el original se conserva íntegro).
+motivo y fecha. Las correcciones de ventas activas conservan revisiones y snapshots
+anteriores/posteriores en el historial administrativo (esquema SQLite v3).
 
 ---
 
@@ -178,6 +188,7 @@ misma ventana en que se introduzca un proxy HTTPS.
 | GET | `/api/admin/session` | sesión | Estado de sesión + `csrfToken` |
 | POST | `/api/admin/logout` | sesión | Cierra sesión |
 | GET | `/api/admin/sales` | sesión | Lista ventas (`?status=active\|voided`, `?limit=`) |
+| POST | `/api/admin/sales/:id/correct` | sesión+CSRF | Corregir venta activa con revisión esperada y clave de reintento; conserva historial |
 | POST | `/api/admin/sales/:id/void` | sesión+CSRF | Anular con motivo |
 | PUT | `/api/admin/catalog` | sesión+CSRF | Reemplazar catálogo (validación estricta) |
 | GET | `/api/admin/audit` | sesión | Auditoría |

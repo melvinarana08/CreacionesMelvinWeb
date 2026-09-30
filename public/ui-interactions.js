@@ -34,23 +34,56 @@ export function updateQuantityControls({ value, valueNode, minusButton, plusButt
 
 export const INLINE_CUSTOMER_LIMIT = 8;
 
-/** Filtra el directorio conservando su orden de uso reciente y limita la lista inline. */
+function normalizeCustomerName(value) {
+  return value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+}
+
+// Only short queries get fuzzy matches; stop the matrix when the edit bound is exceeded.
+function boundedDistance(a, b, bound) {
+  if (Math.abs(a.length - b.length) > bound) return bound + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    if (Math.min(...current) > bound) return bound + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/** Rank exact, prefix, substring, then bounded typos; preserve recent-first ties. */
 export function filterCustomerSuggestions(customers, query = '', limit = INLINE_CUSTOMER_LIMIT) {
   if (!Array.isArray(customers)) return [];
-  const normalizedQuery = String(query).trim().toLocaleLowerCase('es');
+  const needle = normalizeCustomerName(String(query).trim());
   const max = Number.isInteger(limit) && limit > 0 ? Math.min(limit, INLINE_CUSTOMER_LIMIT) : INLINE_CUSTOMER_LIMIT;
   const seen = new Set();
   const matches = [];
   for (const value of customers) {
     if (typeof value !== 'string') continue;
     const clean = value.trim();
-    const key = clean.toLocaleLowerCase('es');
-    if (!clean || seen.has(key) || (normalizedQuery && !key.includes(normalizedQuery))) continue;
+    const key = normalizeCustomerName(clean);
+    if (!key || seen.has(key)) continue;
     seen.add(key);
-    matches.push(clean);
-    if (matches.length === max) break;
+    let rank = 0;
+    if (needle) {
+      if (key === needle) rank = 0;
+      else if (key.startsWith(needle)) rank = 1;
+      else if (key.includes(needle)) rank = 2;
+      else {
+        if (needle.length < 3) continue;
+        const bound = needle.length >= 6 ? 2 : 1;
+        const distance = boundedDistance(needle, key, bound);
+        if (distance > bound) continue;
+        rank = 2 + distance;
+      }
+    }
+    matches.push({ clean, rank, index: matches.length });
   }
-  return matches;
+  matches.sort((a, b) => a.rank - b.rank || a.index - b.index);
+  return matches.slice(0, max).map(({ clean }) => clean);
 }
 
 export function shouldShowCustomerSuggestions({ engaged, matches }) {

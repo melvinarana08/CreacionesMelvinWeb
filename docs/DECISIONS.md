@@ -2,6 +2,20 @@
 
 Registro de las decisiones relevantes y su justificación, para revisión independiente.
 
+## 20. Alcance del POS y correcciones auditadas
+
+- **Venta:** talla y precio manuales valen solo para la línea de la venta actual, sin alterar
+  el catálogo. La vista previa junto a Agregar y el ajuste de cantidades en el carrito
+  muestran y recalculan lo que se cobrará.
+- **Corrección:** solo una venta finalizada activa se puede corregir desde administración;
+  se exige sesión y CSRF, revisión esperada y clave de reintento. El esquema v3 conserva
+  snapshots anterior/posterior por revisión. Una venta anulada permanece terminal.
+- **Clientes y navegación:** alta manual de nombres guardados y sugerencias tolerantes a
+  errores acotados sin dependencias nuevas; teléfono y dirección quedan fuera por ahora.
+  Un menú lateral adaptable reúne las vistas y un único botón recorre Claro → Noche → E-ink.
+- **Motivo:** mejorar la operación sin cambiar el catálogo por excepciones de caja ni
+  perder la trazabilidad de correcciones.
+
 ## 19. Presentación agrupada de tickets y continuidad móvil
 
 - **Venta:** agrupar todas las líneas de un mismo producto solo al renderizar el ticket
@@ -35,7 +49,7 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
 
 ## 18. Temas y controles móviles explícitos (2026-09-25)
 
-- **Temas:** un selector nativo visible persiste `cm_theme` como `light|dark|eink` y refleja
+- **Temas (control anterior; reemplazado por el botón de la decisión 20):** un selector nativo visible persiste `cm_theme` como `light|dark|eink` y refleja
   `cm_eink_mode` para permitir rollback. Una clave nueva válida tiene prioridad. Solo cuando
   `cm_theme` no existe, el legado `cm_eink_mode=true` migra a E-ink; si tampoco es `true`,
   cae en Claro. Una clave nueva presente pero inválida, o almacenamiento inaccesible, cae en
@@ -50,7 +64,7 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
   y conserva `current-password`. Estas pistas son heurísticas y no garantizan obediencia del
   navegador; se descartan señuelos ocultos, `new-password`, `readonly` y atributos privados.
 - **Accesibilidad:** `prefers-reduced-motion` y `forced-colors` se atienden por separado. El
-  selector de tema, las sugerencias y los controles implicados mantienen 44 px como mínimo.
+  control de tema, las sugerencias y los controles implicados mantienen 44 px como mínimo.
 
 ## 15. Navegación: salir de administración regresa a la venta (2026-08-28)
 
@@ -115,15 +129,17 @@ Registro de las decisiones relevantes y su justificación, para revisión indepe
 
 ## 4. Precios inmutables durante la venta: validación contra catálogo vigente
 - **Decisión:** el cliente envía el precio snapshot que mostró; el servidor lo compara con
-  el precio vigente del catálogo. Si difieren → `409 price_changed` (el terminal refresca
-  y el operador reconfirma). La línea guardada queda como snapshot inmutable.
+  el precio vigente del catálogo, salvo una línea manual explícita de la decisión 20.
+  Si difieren → `409 price_changed` (el terminal refresca y el operador reconfirma).
+  El snapshot inicial se conserva en el historial si luego se corrige la venta.
 - **Por qué:** garantiza que lo que el cliente vio es lo que se cobró, sin inventar precios
   en el servidor. El 409, y no un silencio, evita cobrar un precio distinto al mostrado.
 
 ## 5. Anulación inmutable
-- **Decisión:** `voidSale` solo actualiza `status`, `void_reason`, `voided_at`. No existe
-  endpoint de edición/eliminación de ventas (DELETE → 404/405).
-- **Por qué:** requisito explícito; la anulación conserva el original para auditoría.
+- **Decisión inicial:** `voidSale` solo actualiza `status`, `void_reason`, `voided_at`.
+  En v0.1 no existía endpoint de edición/eliminación; la decisión 20 permite corregir
+  ventas activas con historial, no editar anuladas ni eliminar ventas.
+- **Por qué:** la anulación es terminal y el historial de correcciones conserva la auditoría.
 
 ## 6. Sesiones en SQLite + CSRF token por sesión + SameSite=Strict
 - **Decisión:** sesiones persistentes en SQLite (token aleatorio de 256 bits), cookie

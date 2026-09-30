@@ -1,7 +1,7 @@
 // store.js — persistencia y dominio de ventas/catálogo sobre SQLite.
 // Reglas de negocio:
 //  - Cada línea guarda snapshot de nombre/talla/precio (inmutable).
-//  - Precio de venta = precio vigente del catálogo en el momento de la venta.
+//  - Precio de venta = precio vigente del catálogo, salvo línea manual explícita.
 //  - Folio central secuencial, asignado por el servidor.
 //  - Idempotencia por UUID: reenviar la misma venta devuelve la existente.
 //  - La anulación NUNCA edita/elimina la venta: solo marca status + motivo.
@@ -81,8 +81,13 @@ export function validateSaleInput(input, catalog) {
     if (!productEntry) throw new HttpError(400, 'product_not_found', `Producto no existe en el catálogo: ${product}`);
 
     const size = normalizeSize(raw.size);
+    if (size === null) throw new HttpError(400, 'invalid_size', `Talla inválida para ${product}`);
+    const manual = raw.customPrice === true;
+    if (raw.customPrice !== undefined && !manual) {
+      throw new HttpError(400, 'invalid_custom_price', 'Indicador de precio manual inválido');
+    }
     const catalogPrice = findSize(productEntry, size);
-    if (catalogPrice === null) throw new HttpError(400, 'size_not_found', `Talla ${raw.size} no existe para ${product}`);
+    if (!manual && catalogPrice === null) throw new HttpError(400, 'size_not_found', `Talla ${raw.size} no existe para ${product}`);
 
     const quantity = raw.quantity;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) {
@@ -90,10 +95,10 @@ export function validateSaleInput(input, catalog) {
     }
 
     const unitPriceCents = raw.unitPriceCents;
-    if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) {
+    if (!Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0 || unitPriceCents > 1_000_000) {
       throw new HttpError(400, 'invalid_price', `Precio inválido para ${product} talla ${size}`);
     }
-    if (unitPriceCents !== catalogPrice) {
+    if (!manual && unitPriceCents !== catalogPrice) {
       throw new HttpError(
         409,
         'price_changed',
@@ -101,7 +106,8 @@ export function validateSaleInput(input, catalog) {
       );
     }
 
-    items.push({ productName: productEntry.name, size, unitPriceCents, quantity });
+    items.push({ productName: productEntry.name, size, unitPriceCents, quantity,
+      ...(manual ? { customPrice: true } : {}) });
     subtotalCents += lineTotal(unitPriceCents, quantity);
   }
 
@@ -144,15 +150,15 @@ function insertSaleTx(db, sale) {
     serverTs
   );
   const insItem = db.prepare(
-    'INSERT INTO sale_items (sale_id, product_name, size, unit_price_cents, quantity) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO sale_items (sale_id, product_name, size, unit_price_cents, quantity, custom_price) VALUES (?, ?, ?, ?, ?, ?)'
   );
   for (const it of sale.items) {
-    insItem.run(sale.id, it.productName, it.size, it.unitPriceCents, it.quantity);
+    insItem.run(sale.id, it.productName, it.size, it.unitPriceCents, it.quantity, Number(it.customPrice === true));
   }
   if (sale.clientName) {
     upsertClient(db, sale.clientName);
   }
-  return { ...sale, folio, serverTs, status: 'active', voidReason: null, voidedAt: null };
+  return { ...sale, folio, serverTs, status: 'active', revision: 0, voidReason: null, voidedAt: null };
 }
 
 /**
@@ -203,13 +209,14 @@ export function getSale(db, id) {
 
 function hydrate(db, row) {
   const items = db
-    .prepare('SELECT product_name, size, unit_price_cents, quantity FROM sale_items WHERE sale_id = ? ORDER BY id')
+    .prepare('SELECT product_name, size, unit_price_cents, quantity, custom_price FROM sale_items WHERE sale_id = ? ORDER BY id')
     .all(row.id)
     .map((i) => ({
       productName: i.product_name,
       size: i.size,
       unitPriceCents: i.unit_price_cents,
       quantity: i.quantity,
+      ...(i.custom_price ? { customPrice: true } : {}),
     }));
   return {
     id: row.id,
@@ -220,11 +227,16 @@ function hydrate(db, row) {
     discountCents: row.discount_cents,
     totalCents: row.total_cents,
     status: row.status,
+    revision: row.revision,
     clientTs: row.client_ts,
     serverTs: row.server_ts,
     voidReason: row.void_reason,
     voidedAt: row.voided_at,
     items,
+    corrections: db.prepare('SELECT revision, corrected_at, actor, before_snapshot, after_snapshot FROM sale_corrections WHERE sale_id = ? ORDER BY revision').all(row.id).map((c) => ({
+      revision: c.revision, correctedAt: c.corrected_at, actor: c.actor,
+      before: JSON.parse(c.before_snapshot), after: JSON.parse(c.after_snapshot),
+    })),
   };
 }
 
@@ -261,6 +273,80 @@ export function voidSale(db, id, reason) {
     id
   );
   return getSale(db, id);
+}
+
+/** Atomically correct an active sale; exact retry keys replay without appending history. */
+export function correctSale(db, id, input, catalog, actor = null) {
+  if (!input || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) {
+    throw new HttpError(400, 'invalid_revision', 'Revisión esperada inválida');
+  }
+  if (typeof input.retryKey !== 'string' || !UUID_RE.test(input.retryKey)) {
+    throw new HttpError(400, 'invalid_retry_key', 'Clave de reintento inválida');
+  }
+  if (!Array.isArray(input.lines) || input.lines.length === 0) {
+    throw new HttpError(400, 'no_lines', 'La venta debe tener al menos una línea');
+  }
+  const request = JSON.stringify({ expectedRevision: input.expectedRevision, retryKey: input.retryKey,
+    clientName: input.clientName, discountCents: input.discountCents, lines: input.lines });
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const prior = getSale(db, id);
+    if (!prior) throw new HttpError(404, 'sale_not_found', 'Venta no encontrada');
+    const replay = db.prepare('SELECT request, revision FROM sale_corrections WHERE sale_id = ? AND retry_key = ?').get(id, input.retryKey);
+    if (replay) {
+      if (replay.request !== request) throw new HttpError(409, 'retry_key_conflict', 'Clave de reintento utilizada con otros datos');
+      if (replay.revision !== prior.revision) throw new HttpError(409, 'stale_revision', 'La venta fue modificada después de esta corrección');
+      db.exec('COMMIT');
+      return prior;
+    }
+    if (prior.status !== 'active') throw new HttpError(409, 'already_voided', 'La venta ya está anulada');
+    if (prior.revision !== input.expectedRevision) throw new HttpError(409, 'stale_revision', 'La venta fue modificada; recarga antes de corregir');
+    const available = [...prior.items];
+    const items = [];
+    let subtotalCents = 0;
+    for (const raw of input.lines) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new HttpError(400, 'invalid_line', 'Línea de venta inválida');
+      }
+      const matched = available.findIndex((item) => item.productName === raw?.product && item.size === raw.size
+        && item.quantity === raw.quantity && item.unitPriceCents === raw.unitPriceCents
+        && Boolean(item.customPrice) === (raw.customPrice === true) &&
+        (raw.customPrice === undefined || raw.customPrice === true));
+      let item;
+      if (matched >= 0) item = available.splice(matched, 1)[0];
+      else item = validateSaleInput({ id, deviceId: prior.deviceId, clientName: null,
+        lines: [raw], discountCents: 0 }, catalog).items[0];
+      items.push(item);
+      subtotalCents += lineTotal(item.unitPriceCents, item.quantity);
+    }
+    const clientName = typeof input.clientName === 'string' ? input.clientName.trim() : input.clientName;
+    if (clientName !== null && (typeof clientName !== 'string' || clientName.length > MAX_CLIENT_NAME)) {
+      throw new HttpError(400, 'invalid_client_name', 'Cliente inválido');
+    }
+    if (!Number.isSafeInteger(input.discountCents) || input.discountCents < 0) {
+      throw new HttpError(400, 'invalid_discount', 'Descuento inválido');
+    }
+    if (input.discountCents > subtotalCents) throw new HttpError(400, 'discount_exceeds_subtotal', 'El descuento no puede ser mayor al subtotal');
+    const revision = prior.revision + 1;
+    const updated = db.prepare('UPDATE sales SET client_name = ?, subtotal_cents = ?, discount_cents = ?, total_cents = ?, revision = ? WHERE id = ? AND status = ? AND revision = ?')
+      .run(clientName || null, subtotalCents, input.discountCents, subtotalCents - input.discountCents, revision, id, 'active', prior.revision);
+    if (updated.changes !== 1) throw new HttpError(409, 'stale_revision', 'La venta fue modificada');
+    db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(id);
+    const insert = db.prepare('INSERT INTO sale_items (sale_id, product_name, size, unit_price_cents, quantity, custom_price) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const item of items) insert.run(id, item.productName, item.size, item.unitPriceCents, item.quantity, Number(item.customPrice === true));
+    if (clientName) upsertClient(db, clientName);
+    const after = getSale(db, id);
+    const snapshot = (sale) => ({ id: sale.id, folio: sale.folio, revision: sale.revision,
+      clientName: sale.clientName, items: sale.items, subtotalCents: sale.subtotalCents,
+      discountCents: sale.discountCents, totalCents: sale.totalCents });
+    db.prepare('INSERT INTO sale_corrections (sale_id, revision, retry_key, request, corrected_at, actor, before_snapshot, after_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, revision, input.retryKey, request, new Date().toISOString(), actor, JSON.stringify(snapshot(prior)), JSON.stringify(snapshot(after)));
+    db.exec('COMMIT');
+    return getSale(db, id);
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 }
 
 /** UUID v4 para pruebas/uso puntual. */

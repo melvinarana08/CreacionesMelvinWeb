@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   applySelectedCustomer,
   clampQuantity,
@@ -28,6 +29,14 @@ function fakeChip(name, quantity) {
     getAttribute(attribute) { return attributes.get(attribute); },
   };
 }
+
+test('entrada manual y vista previa contigua tienen etiquetas y anuncio accesible', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="manualLineToggle"[^>]*type="checkbox"/);
+  assert.match(html, /for="manualSizeInput"/);
+  assert.match(html, /for="manualPriceInput"/);
+  assert.match(html, /class="picker-add-row">\s*<span id="addLinePreview"[^>]*aria-live="polite"[^>]*>[^<]*<\/span>\s*<button[^>]*id="addLineBtn"/);
+});
 
 test('updateSizeChipSelection conserva objetos y foco mientras actualiza estado accesible', () => {
   const first = fakeChip('4');
@@ -84,6 +93,19 @@ test('sugerencias filtran por subcadena sin distinguir mayúsculas, conservan re
   assert.deepEqual(filterCustomerSuggestions(names, '').slice(0, 2), ['María reciente', 'Carlos']);
   assert.equal(filterCustomerSuggestions(names, '').length, 8);
   assert.deepEqual(filterCustomerSuggestions([' Ana ', 'ana', '', null], ''), ['Ana']);
+});
+
+test('saved customer suggestions rank exact, prefix, substring, then bounded typos with recency ties', () => {
+  assert.deepEqual(filterCustomerSuggestions(
+    ['Prdoro', 'Pedro viejo', 'Don Pedro', 'Pedra', 'Prdro', 'Pedro'], 'Prdro'),
+  ['Prdro', 'Prdoro', 'Pedro']);
+  assert.deepEqual(filterCustomerSuggestions(
+    ['Pedro reciente', 'PEDRO', 'Pedrito', 'Don Pedro', 'Prdro', 'Petro'], 'pedro'),
+  ['PEDRO', 'Pedro reciente', 'Don Pedro', 'Prdro', 'Petro']);
+  assert.deepEqual(filterCustomerSuggestions(['María', 'Maria', 'Mario'], 'MARIA'), ['María', 'Mario']);
+  assert.deepEqual(filterCustomerSuggestions(['Pedro', 'Alba'], 'P'), ['Pedro']);
+  assert.deepEqual(filterCustomerSuggestions(['Pedro', 'Pilar'], 'zzzzzz'), []);
+  assert.equal(filterCustomerSuggestions(Array(20).fill('Pedro').concat(['Ana']), '', 100).length, 2);
 });
 
 test('sugerencias solo se muestran durante interacción y con coincidencias', () => {

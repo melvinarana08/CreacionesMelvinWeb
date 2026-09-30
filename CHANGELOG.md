@@ -4,6 +4,13 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 
 ## [Unreleased]
 
+### Mejoras del punto de venta
+- Talla y precio manuales por línea solo para la venta actual, vista previa junto a **Agregar** y cantidades ajustables en el carrito con totales actualizados.
+- Corrección administrativa de ventas finalizadas activas con revisiones y snapshots anterior/posterior; las anuladas no admiten cambios. Esquema SQLite v3 y `POST /api/admin/sales/:id/correct` con sesión y CSRF.
+- Alta manual de clientes guardados por nombre y sugerencias que priorizan coincidencias exactas y toleran errores de escritura acotados; sin teléfono ni dirección.
+- Menú lateral adaptable para ventas, encargos, clientes y administración; un botón recorre Claro → Noche → E-ink y muestra el modo activo.
+- Caché PWA actualizada a `cm-sales-v22`.
+
 ### Ajustes de tickets y venta
 - Los tickets de venta térmicos, PNG y de texto agrupan productos intercalados en orden de primera aparición, con nombre único y cada fila de cantidad/talla, unitario e importe conservada. No cambia el formato de taller/encargos ni los datos guardados.
 - Atajos de cantidad 3, 6, 9 y 12; −/+ mantienen el rango 1–99. Intentar agregar sin talla muestra una guía inline accesible junto al selector.
@@ -11,7 +18,7 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - Caché del frontend actualizada a `cm-sales-v21` y regresiones ejecutables para los tres tickets y los controles.
 
 ### Añadido
-- **Selector de tema Claro/Noche/E-ink**: persiste una única preferencia `light|dark|eink`, migra el legado e-ink, actualiza el color del navegador y mantiene Noche coloreado e independiente de las restricciones monocromas, hápticas y de movimiento de E-ink.
+- **Control anterior de tema Claro/Noche/E-ink (reemplazado arriba por un botón)**: persiste una única preferencia `light|dark|eink`, migra el legado e-ink, actualiza el color del navegador y mantiene Noche coloreado e independiente de las restricciones monocromas, hápticas y de movimiento de E-ink.
 - **Clientes recientes inline**: foco o toque en el cliente opcional muestra hasta ocho nombres recientes como botones táctiles, con filtro por subcadena, selección anunciada y cierres seguros por Escape, foco o interacción exterior; el directorio completo sigue disponible.
 - **Ticket visual PNG sin dependencias**: el comprobante se compone de forma determinista desde el modelo de venta y se dibuja con Canvas 2D en blanco y negro, con texto Unicode, nombres largos, tallas personalizadas, cantidades hasta 99, alto dinámico y límites de tamaño/DPR.
 - **Compartir imagen primero con respaldo privado**: el PNG se prepara antes del toque y solo se entrega a Web Share cuando `navigator.canShare({ files })` lo admite. Sin soporte o ante un fallo no cancelado, se descarga la imagen y se copia el texto; sin portapapeles se ofrece copia manual. `AbortError` no dispara descarga, copia ni diálogo.
@@ -90,7 +97,7 @@ Todas las fechas en hora local del autor. Formato inspirado en [Keep a Changelog
 - La caché PWA sube a `cm-sales-v11` para distribuir las mejoras de selección, orden y presentación.
 
 ### Compatibilidad de datos
-- No se modificaron los contratos de API, el esquema SQLite ni el catálogo persistido. El ajuste de backend se limita a conservar la idempotencia de reintentos por UUID frente a cambios posteriores de precio.
+- Para el ajuste de idempotencia descrito arriba no se modificaron los contratos de API ni el esquema SQLite; las mejoras posteriores de este Unreleased sí agregan correcciones administrativas y esquema v3. El catálogo persistido no se modifica por tallas o precios manuales.
 
 ## [0.1.0] — 2026-08-24
 
@@ -103,7 +110,7 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
     (nombre/talla/precio), timestamps cliente/servidor, `deviceId`, estado.
   - Descuento manual validado (no negativo, ≤ subtotal).
   - Catálogo en SQLite, seed desde `productos.json` (incluye Short), reemplazo admin.
-  - Anulación con motivo; la venta original nunca se edita ni elimina.
+  - En la versión inicial, anulación con motivo sin edición ni eliminación de ventas; las correcciones auditadas de ventas activas se añadieron después.
   - Login admin con scrypt + sesiones + CSRF token + `Origin` check + rate-limit.
   - Cookie `HttpOnly; SameSite=Strict; Secure` configurable.
   - `SELLER_TOKEN` opcional para el endpoint de ventas (`X-Seller-Token`).
@@ -144,7 +151,7 @@ Primera versión completa y pequeña de la calculadora de ventas de Creaciones M
 - La caché PWA sube a `cm-sales-v4` para distribuir estos cambios.
 
 ### No incluido en esta versión
-- Edición/eliminación de ventas (prohibido por diseño).
+- En v0.1.0 no había edición/eliminación de ventas; Unreleased incorpora corrección auditada de ventas activas, no eliminación.
 - Restauración manual con verificación en vivo (solo drill automatizado).
 - Impresión térmica Bluetooth de tickets de 53 mm u 80 mm (próxima implementación de este
   proyecto; independiente de la Epson TM usada por Gym OS).

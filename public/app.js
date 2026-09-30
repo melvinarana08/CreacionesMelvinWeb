@@ -47,6 +47,7 @@ const state = {
   encargosSubtab: 'summary',
   printingKeys: new Set(),
   finalizingSale: false,
+  correction: null,
 };
 
 // ---------------- Utilidades de render (siempre textContent) ----------------
@@ -86,16 +87,35 @@ function renderCart() {
     const info = el('div', 'cart-item-info');
     info.append(el('div', 'cart-item-name', line.product), el('div', 'cart-item-sub', D.formatUnitPriceSummary(line)));
     const price = el('div', 'cart-item-price', D.formatUSD(D.computeLineTotal(line.unitPriceCents, line.quantity)));
+    const controls = el('div', 'cart-item-controls');
+    for (const [delta, label, symbol] of [[-1, 'Disminuir', '−'], [1, 'Aumentar', '+']]) {
+      const button = el('button', 'btn', symbol);
+      button.type = 'button';
+      button.setAttribute('aria-label', `${label} cantidad de ${line.product} talla ${line.size}`);
+      button.disabled = delta < 0 ? line.quantity <= 1 : line.quantity >= 99;
+      button.addEventListener('click', () => {
+        const index = state.cart.indexOf(line);
+        if (index < 0) return;
+        const updated = D.changeLineQuantity(line, delta);
+        if (!updated) return;
+        state.cart[index] = updated;
+        if (!state.correction) S.saveCart(state.cart);
+        renderCart();
+      });
+      controls.append(button);
+      if (delta < 0) controls.append(el('span', 'cart-item-quantity', String(line.quantity)));
+    }
     const rm = el('button', 'remove-btn', '✕');
+    rm.type = 'button';
     rm.setAttribute('aria-label', `Quitar ${line.product} talla ${line.size}`);
     rm.addEventListener('click', () => {
       const i = state.cart.indexOf(line);
       if (i < 0) return;
       state.cart.splice(i, 1);
-      S.saveCart(state.cart);
+      if (!state.correction) S.saveCart(state.cart);
       renderCart();
     });
-    li.append(info, price, rm);
+    li.append(info, price, controls, rm);
     list.append(li);
   }
 
@@ -112,12 +132,14 @@ function renderCart() {
     $('finishBtn').hidden = !state.activeEncargoId;
     $('saveAsEncargoBtn').hidden = Boolean(state.activeEncargoId);
   } else {
-    $('cartTitle').textContent = 'Venta actual';
+    $('cartTitle').textContent = state.correction ? `Corrigiendo folio ${state.correction.sale.folio}` : 'Venta actual';
     $('cancelEncargoModeBtn').hidden = true;
     $('encargoNotesRow').hidden = true;
     $('finishBtn').hidden = false;
-    $('saveAsEncargoBtn').hidden = false;
+    $('saveAsEncargoBtn').hidden = Boolean(state.correction);
   }
+  $('cancelSaleCorrectionBtn').hidden = !state.correction;
+  $('finishBtn').textContent = state.correction ? 'Guardar corrección' : 'Finalizar venta';
 
   $('finishBtn').disabled = state.cart.length === 0 || !discountValid.ok;
   $('saveAsEncargoBtn').disabled = state.cart.length === 0;
@@ -164,6 +186,10 @@ function openPicker(product, keepSelection = false) {
   if (!keepSelection || productChanged) {
     state.selectedSize = null;
     state.qty = 1;
+    $('manualLineToggle').checked = false;
+    $('manualLineFields').hidden = true;
+    $('manualSizeInput').value = '';
+    $('manualPriceInput').value = '';
   } else if (!product.sizes.some((s) => s.size === state.selectedSize)) {
     state.selectedSize = null;
   }
@@ -181,11 +207,19 @@ function openPicker(product, keepSelection = false) {
       updateSizeChipSelection(chips.children, chip);
       $('sizeGuidance').hidden = true;
       chips.removeAttribute('aria-invalid');
+      updateAddPreview();
     });
     chips.append(chip);
   }
   setQuantity(state.qty);
+  updateAddPreview();
   $('sizePicker').hidden = false;
+}
+
+function updateAddPreview() {
+  const manual = $('manualLineToggle').checked;
+  const size = manual ? D.normalizeSizeInput($('manualSizeInput').value) : state.selectedSize;
+  $('addLinePreview').textContent = D.formatAddPreview(state.selectedCategory, size, state.qty);
 }
 
 function setQuantity(value) {
@@ -196,6 +230,7 @@ function setQuantity(value) {
     plusButton: $('qtyPlus'),
     presets: document.querySelectorAll('.qty-preset'),
   });
+  updateAddPreview();
   return state.qty;
 }
 
@@ -319,8 +354,74 @@ async function syncAll() {
 
 // ---------------- Flujo de venta ----------------
 
+function leaveSaleCorrection() {
+  if (!state.correction) return;
+  const previous = state.correction.previous;
+  state.correction = null;
+  state.cart = previous.cart;
+  state.discountCents = previous.discountCents;
+  $('clientInput').value = previous.clientName;
+  renderCart();
+}
+
+function editCompletedSale(sale) {
+  if (!state.admin.csrf || sale.status !== 'active' || state.correction || state.encargoMode) return;
+  state.correction = {
+    sale,
+    previous: { cart: state.cart, discountCents: state.discountCents, clientName: $('clientInput').value },
+    retryKey: null,
+    requestContent: null,
+  };
+  state.cart = sale.items.map((item) => ({ product: item.productName, size: item.size,
+    quantity: item.quantity, unitPriceCents: item.unitPriceCents,
+    ...(item.customPrice ? { customPrice: true } : {}) }));
+  state.discountCents = sale.discountCents;
+  $('clientInput').value = sale.clientName || '';
+  $('saleDetailDialog').close();
+  showSaleView();
+  renderCart();
+  $('cartSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveSaleCorrection() {
+  const editing = state.correction;
+  if (!editing || !state.admin.csrf || state.finalizingSale) return;
+  const built = D.buildSalePayload({ cart: state.cart, clientName: $('clientInput').value,
+    discountCents: state.discountCents, deviceId: editing.sale.deviceId, id: editing.sale.id });
+  if (!built.ok) { showError('cartError', built.reason); return; }
+  const content = JSON.stringify({ clientName: built.payload.clientName,
+    discountCents: built.payload.discountCents, lines: built.payload.lines });
+  if (editing.requestContent !== content) {
+    editing.requestContent = content;
+    editing.retryKey = S.createUuid();
+  }
+  const correction = { ...JSON.parse(content), expectedRevision: editing.sale.revision, retryKey: editing.retryKey };
+  state.finalizingSale = true;
+  $('finishBtn').disabled = true;
+  $('cartSection').inert = true;
+  try {
+    const result = await Api.adminCorrectSale(state.admin.csrf, editing.sale.id, correction);
+    if (!result.ok) {
+      if (result.status === 401) requireAdminLogin();
+      renderCart();
+      showError('cartError', result.error.message);
+      return;
+    }
+    leaveSaleCorrection();
+    showError('cartError', null);
+    showAdminLogin();
+    await enterAdminPanel();
+    openSaleDetail(result.data.sale);
+  } finally {
+    state.finalizingSale = false;
+    $('cartSection').inert = false;
+    $('finishBtn').disabled = state.cart.length === 0 || !D.validateDiscount(state.discountCents, D.computeSubtotal(state.cart)).ok;
+  }
+}
+
 async function finalizeSale() {
   if (state.finalizingSale) return;
+  if (state.correction) return saveSaleCorrection();
   const built = D.buildSalePayload({
     cart: state.cart,
     clientName: $('clientInput').value,
@@ -566,6 +667,8 @@ async function printCurrentReceipt(event) {
 }
 
 function showReceipt() {
+  setActiveNavigation(null);
+  $('customersView').hidden = true;
   $('saleView').hidden = true;
   $('adminView').hidden = true;
   $('encargosView').hidden = true;
@@ -728,9 +831,46 @@ async function openLocalSalesDialog() {
   }
 }
 
+// ---------------- Navegación ----------------
+
+function closeNavigation(restoreFocus = false) {
+  const wasOpen = !$('sideNav').hidden;
+  $('sideNav').hidden = true;
+  $('navBackdrop').hidden = true;
+  $('navToggleBtn').setAttribute('aria-expanded', 'false');
+  $('navToggleBtn').setAttribute('aria-label', 'Abrir menú');
+  if (window.matchMedia?.('(min-width: 1100px)').matches) $('sideNav').hidden = false;
+  if (restoreFocus && wasOpen) $('navToggleBtn').focus();
+}
+
+function setActiveNavigation(id) {
+  closeNavigation();
+  for (const key of ['navSalesBtn', 'navEncargosBtn', 'navCustomersBtn', 'adminLink']) {
+    const button = $(key);
+    button.classList.toggle('active', key === id);
+    if (key === id) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
+
+function showCustomersView() {
+  setActiveNavigation('navCustomersBtn');
+  $('saleView').hidden = true;
+  $('encargosView').hidden = true;
+  $('receiptView').hidden = true;
+  $('adminView').hidden = true;
+  $('customersView').hidden = false;
+  $('mobileCartBar').hidden = true;
+  state.clients = S.loadClients();
+  renderCustomersList();
+  loadClientsList();
+}
+
 // ---------------- Administración ----------------
 
 function showAdminLogin() {
+  setActiveNavigation('adminLink');
+  $('customersView').hidden = true;
   state.admin.authenticated = false;
   $('saleView').hidden = true;
   $('receiptView').hidden = true;
@@ -744,26 +884,22 @@ function showAdminLogin() {
 
 /** Regresa al panel principal (venta). Usado al salir de administración o cancelar el login. */
 function showSaleView() {
+  setActiveNavigation('navSalesBtn');
+  $('customersView').hidden = true;
   $('adminView').hidden = true;
   $('receiptView').hidden = true;
   $('encargosView').hidden = true;
   $('saleView').hidden = false;
-  $('navSalesBtn').classList.add('active');
-  $('navEncargosBtn').classList.remove('active');
-  $('navSalesBtn').setAttribute('aria-pressed', 'true');
-  $('navEncargosBtn').setAttribute('aria-pressed', 'false');
   renderCart();
 }
 
 function showEncargosView() {
+  setActiveNavigation('navEncargosBtn');
+  $('customersView').hidden = true;
   $('adminView').hidden = true;
   $('receiptView').hidden = true;
   $('saleView').hidden = true;
   $('encargosView').hidden = false;
-  $('navEncargosBtn').classList.add('active');
-  $('navSalesBtn').classList.remove('active');
-  $('navEncargosBtn').setAttribute('aria-pressed', 'true');
-  $('navSalesBtn').setAttribute('aria-pressed', 'false');
   const bar = $('mobileCartBar');
   if (bar) bar.hidden = true;
   loadEncargos();
@@ -890,6 +1026,11 @@ function openSaleDetail(sale) {
   const total = el('div', 'receipt-line receipt-total');
   total.append(el('span', null, 'TOTAL'), el('span', null, D.formatUSD(sale.totalCents)));
   body.append(total);
+  for (const change of sale.corrections || []) {
+    body.append(el('p', 'muted', `Corrección ${change.revision} · ${new Date(change.correctedAt).toLocaleString('es')}`));
+    body.append(el('p', 'muted', `Antes: ${D.formatUSD(change.before.totalCents)} · Después: ${D.formatUSD(change.after.totalCents)}`));
+  }
+  $('saleDetailEditBtn').hidden = sale.status !== 'active' || !state.admin.csrf || Boolean(state.correction);
   showSaleDetailStatus(null);
   $('saleDetailDialog').showModal();
 }
@@ -1529,6 +1670,7 @@ async function printEncargosSummaryTicketAction(event) {
 async function loadClientsList() {
   state.clients = S.loadClients();
   if (state.customerSuggestionsEngaged) renderInlineCustomerSuggestions();
+  if (!$('customersView').hidden) renderCustomersList();
   try {
     const res = await Api.fetchClients();
     if (res.ok && Array.isArray(res.data?.clients)) {
@@ -1537,6 +1679,7 @@ async function loadClientsList() {
       }
       state.clients = S.loadClients();
       if (state.customerSuggestionsEngaged) renderInlineCustomerSuggestions();
+      if (!$('customersView').hidden) renderCustomersList();
     }
   } catch {
     /* offline */
@@ -1604,8 +1747,7 @@ function renderClientChips(filterText = '') {
   const container = $('clientChipsList');
   container.replaceChildren();
 
-  const query = (filterText || '').trim().toLocaleLowerCase('es');
-  const matched = state.clients.filter((c) => !query || c.toLocaleLowerCase('es').includes(query));
+  const matched = filterCustomerSuggestions(state.clients, filterText, 8);
 
   if (matched.length === 0) {
     container.append(el('p', 'muted', 'No hay clientes guardados que coincidan. Escribe el nombre arriba para usarlo.'));
@@ -1618,6 +1760,54 @@ function renderClientChips(filterText = '') {
     chip.addEventListener('click', () => chooseCustomer(name));
     container.append(chip);
   }
+}
+
+function renderCustomersList() {
+  const list = $('customersList');
+  list.replaceChildren();
+  const query = $('customerSearchInput').value.trim();
+  const matches = query ? filterCustomerSuggestions(state.clients, query) : state.clients;
+  if (!matches.length) {
+    list.append(el('li', 'muted', 'No hay clientes guardados que coincidan.'));
+    return;
+  }
+  for (const name of matches) list.append(el('li', 'customer-list-item', name));
+}
+
+async function createCustomer(event) {
+  event.preventDefault();
+  const name = $('customerNameInput').value.trim();
+  if (!name || name.length > 100) {
+    showCustomerStatus('Escribí un nombre de hasta 100 caracteres.', 'failure');
+    return;
+  }
+  const button = $('createCustomerBtn');
+  button.disabled = true;
+  try {
+    const res = await Api.postClient(name);
+    if (!res.ok && !res.networkError) {
+      showCustomerStatus(res.error?.message || 'No se pudo guardar el cliente.', 'failure');
+      return;
+    }
+    S.rememberClient(res.ok ? res.data?.name || name : name);
+    state.clients = S.loadClients();
+    $('customerNameInput').value = '';
+    $('customerSearchInput').value = '';
+    renderCustomersList();
+    showCustomerStatus(res.ok ? 'Cliente guardado.' : 'Cliente guardado solo en este dispositivo. Volvé a guardarlo cuando tengas conexión para compartirlo.', 'success');
+    if (res.ok) loadClientsList();
+  } catch {
+    showCustomerStatus('No se pudo guardar el cliente.', 'failure');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function showCustomerStatus(message, type) {
+  const node = $('customerCreateStatus');
+  node.hidden = false;
+  node.className = `status-text ${type}`;
+  node.textContent = message;
 }
 
 // ---------------- Carga inicial ----------------
@@ -1642,13 +1832,25 @@ async function loadCatalog() {
 }
 
 const THEME_COLORS = Object.freeze({ light: '#0f766e', dark: '#0f172a', eink: '#ffffff' });
+const THEME_ORDER = ['light', 'dark', 'eink'];
+const THEME_LABELS = Object.freeze({ light: 'Claro', dark: 'Noche', eink: 'E-ink' });
 
 function applyTheme(theme) {
   const selectedTheme = Object.hasOwn(THEME_COLORS, theme) ? theme : 'light';
+  const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(selectedTheme) + 1) % THEME_ORDER.length];
   document.documentElement.dataset.theme = selectedTheme;
   document.documentElement.classList.toggle('eink-mode', selectedTheme === 'eink');
-  $('themeSelect').value = selectedTheme;
+  $('themeButton').textContent = `Tema: ${THEME_LABELS[selectedTheme]}`;
+  $('themeButton').setAttribute('aria-label', `Tema actual: ${THEME_LABELS[selectedTheme]}. Cambiar a ${THEME_LABELS[nextTheme]}`);
+  $('themeStatus').textContent = `Tema activo: ${THEME_LABELS[selectedTheme]}`;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[selectedTheme]);
+}
+
+function cycleTheme() {
+  const currentTheme = document.documentElement.dataset.theme;
+  const nextTheme = THEME_ORDER[(THEME_ORDER.indexOf(currentTheme) + 1) % THEME_ORDER.length];
+  applyTheme(nextTheme);
+  S.saveTheme(nextTheme);
 }
 
 async function init() {
@@ -1684,23 +1886,47 @@ async function init() {
       triggerHaptic(10);
     });
   }
+  $('manualLineToggle').addEventListener('change', () => {
+    $('manualLineFields').hidden = !$('manualLineToggle').checked;
+    $('sizeGuidance').hidden = true;
+    updateAddPreview();
+  });
+  $('manualSizeInput').addEventListener('input', updateAddPreview);
+  $('manualPriceInput').addEventListener('input', updateAddPreview);
   $('addLineBtn').addEventListener('click', () => {
-    if (state.selectedSize === null) {
+    const manual = $('manualLineToggle').checked;
+    const size = manual ? D.normalizeSizeInput($('manualSizeInput').value) : state.selectedSize;
+    if (size === null) {
+      $('sizeGuidance').textContent = manual ? 'Escribí una talla válida antes de agregar.' : 'Elegí una talla antes de agregar.';
       $('sizeGuidance').hidden = false;
-      $('sizeChips').setAttribute('aria-invalid', 'true');
+      if (!manual) $('sizeChips').setAttribute('aria-invalid', 'true');
       return;
     }
     const product = state.catalog.find((p) => p.name === state.selectedCategory);
     if (!product) return;
-    const price = product.sizes.find((s) => s.size === state.selectedSize)?.priceCents;
-    const line = { product: product.name, size: state.selectedSize, quantity: state.qty, unitPriceCents: price };
+    const price = manual ? D.parseSalePriceInput($('manualPriceInput').value)
+      : product.sizes.find((s) => s.size === size)?.priceCents;
+    if (manual && price === null) {
+      showError('cartError', 'Escribí un precio válido de 0.00 a 10000.00 (máximo dos decimales).');
+      return;
+    }
+    const line = { product: product.name, size, quantity: state.qty, unitPriceCents: price,
+      ...(manual ? { customPrice: true } : {}) };
     const v = D.validateLine(line);
     if (!v.ok) { showError('cartError', v.reason); return; }
-    const existing = state.cart.find((l) => l.product === line.product && l.size === line.size);
-    if (existing) existing.quantity = Math.min(99, existing.quantity + line.quantity);
-    else state.cart.push(line);
-    S.saveCart(state.cart);
+    const existing = state.cart.find((l) => l.product === line.product && l.size === line.size
+      && l.unitPriceCents === line.unitPriceCents && Boolean(l.customPrice) === manual);
+    if (existing) {
+      const updated = D.changeLineQuantity(existing, line.quantity);
+      if (!updated) { showError('cartError', 'La cantidad máxima por línea es 99.'); return; }
+      state.cart[state.cart.indexOf(existing)] = updated;
+    } else state.cart.push(line);
+    if (!state.correction) S.saveCart(state.cart);
     showError('cartError', null);
+    if (manual) {
+      $('manualSizeInput').value = '';
+      $('manualPriceInput').value = '';
+    }
 
     // Reset de cantidad para el siguiente producto y feedback táctil/visual
     setQuantity(1);
@@ -1733,9 +1959,7 @@ async function init() {
     $('shareReceiptBtn').removeAttribute('aria-busy');
     showPrintStatus(null);
     showShareStatus(null);
-    $('receiptView').hidden = true;
-    $('saleView').hidden = false;
-    renderCart();
+    showSaleView();
   });
   // Observador para ocultar la barra flotante móvil en cuanto el botón "Finalizar venta" entra en pantalla
   if (typeof IntersectionObserver !== 'undefined') {
@@ -1765,10 +1989,7 @@ async function init() {
     input.type = isPassword ? 'text' : 'password';
     btn.textContent = isPassword ? '🙈' : '👁️';
   });
-  $('themeSelect').addEventListener('change', (event) => {
-    applyTheme(event.currentTarget.value);
-    S.saveTheme(event.currentTarget.value);
-  });
+  $('themeButton').addEventListener('click', cycleTheme);
   $('syncBtn').addEventListener('click', () => { state.online = navigator.onLine; renderStatus(); syncAll(); });
   $('pricesBtn').addEventListener('click', openPricesDialog);
   $('pricesFilter').addEventListener('change', renderPricesList);
@@ -1795,6 +2016,7 @@ async function init() {
   });
   $('adminLogoutBtn').addEventListener('click', async () => {
     await Api.adminLogout(state.admin.csrf);
+    leaveSaleCorrection();
     state.admin.csrf = null;
     showSaleView();
   });
@@ -1826,6 +2048,8 @@ async function init() {
   // Detalle de venta (diálogo)
   $('saleDetailCloseBtn').addEventListener('click', () => $('saleDetailDialog').close());
   $('saleDetailReprintBtn').addEventListener('click', reprintFromDetail);
+  $('saleDetailEditBtn').addEventListener('click', () => { if (saleDetailCache) editCompletedSale(saleDetailCache); });
+  $('cancelSaleCorrectionBtn').addEventListener('click', leaveSaleCorrection);
 
   // Estado de conexión
   window.addEventListener('online', () => { state.online = true; renderStatus(); syncAll(); });
@@ -1834,9 +2058,35 @@ async function init() {
     if (!document.hidden) syncAll();
   });
 
-  // Navegación principal Encargos / Ventas
+  // Navegación principal; el menú móvil conserva Escape, foco y cierre exterior.
+  $('navToggleBtn').addEventListener('click', () => {
+    if (!$('sideNav').hidden) { closeNavigation(true); return; }
+    $('sideNav').hidden = false;
+    $('navBackdrop').hidden = false;
+    $('navToggleBtn').setAttribute('aria-expanded', 'true');
+    $('navToggleBtn').setAttribute('aria-label', 'Cerrar menú');
+    $('navCloseBtn').focus();
+  });
+  $('navCloseBtn').addEventListener('click', () => closeNavigation(true));
+  $('navBackdrop').addEventListener('click', () => closeNavigation(true));
+  document.addEventListener('keydown', (event) => {
+    if ($('navBackdrop').hidden) return;
+    if (event.key === 'Escape') closeNavigation(true);
+    if (event.key === 'Tab') {
+      const items = [...$('sideNav').querySelectorAll('button')];
+      const first = items[0];
+      const last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
+  window.matchMedia?.('(min-width: 1100px)').addEventListener?.('change', () => closeNavigation());
+  closeNavigation();
   $('navSalesBtn').addEventListener('click', showSaleView);
   $('navEncargosBtn').addEventListener('click', showEncargosView);
+  $('navCustomersBtn').addEventListener('click', showCustomersView);
+  $('createCustomerForm').addEventListener('submit', createCustomer);
+  $('customerSearchInput').addEventListener('input', renderCustomersList);
   $('newEncargoBtn').addEventListener('click', () => enterEncargoMode());
   $('saveAsEncargoBtn').addEventListener('click', saveCurrentCartAsEncargo);
   $('cancelEncargoModeBtn').addEventListener('click', exitEncargoMode);
@@ -1900,7 +2150,7 @@ async function renderAppVersion() {
     const res = await Api.fetchHealth();
     if (res.ok) serverVersion = res.data.version || '';
   } catch { /* sin conexión */ }
-  const swVersion = 'v21';
+  const swVersion = 'v22';
   const parts = [];
   if (serverVersion) parts.push(`v${serverVersion}`);
   parts.push(`cache ${swVersion}`);

@@ -7,6 +7,7 @@ import { loadSeed } from '../server/catalog.js';
 import {
   validateSaleInput,
   createSale,
+  correctSale,
   voidSale,
   getSale,
   listSales,
@@ -90,6 +91,32 @@ test('precio enviado distinto al catálogo es rechazado (409 price_changed)', ()
   expectError(() => validateSaleInput(bad, catalog()), 'price_changed', 409);
 });
 
+test('precio y talla manuales se guardan como snapshot sin modificar el catálogo', () => {
+  const db = freshDb();
+  const line = { product: 'Short', size: 'A medida', quantity: 2, unitPriceCents: 1200, customPrice: true };
+  const sale = createSale(db, validInput({ lines: [line] }), getCatalog(db));
+  assert.equal(sale.totalCents, 2400);
+  assert.deepEqual(getSale(db, sale.id).items[0], {
+    productName: 'Short', size: 'A medida', unitPriceCents: 1200, quantity: 2, customPrice: true,
+  });
+  assert.equal(getCatalog(db).find((p) => p.name === 'Short').sizes.some((s) => s.size === 'A medida'), false);
+  assert.equal(createSale(db, validInput({ lines: [line] }), getCatalog(db)).folio, sale.folio);
+  db.close();
+});
+
+test('excepción manual exige indicador explícito, producto existente y entradas acotadas', () => {
+  const base = { product: 'Short', size: 'A medida', quantity: 1, unitPriceCents: 1200 };
+  const check = (line, code) => expectError(() => validateSaleInput(validInput({ lines: [line] }), catalog()), code, 400);
+  check(base, 'size_not_found');
+  check({ ...base, customPrice: 'true' }, 'invalid_custom_price');
+  check({ ...base, size: '' , customPrice: true }, 'invalid_size');
+  check({ ...base, size: 'x'.repeat(21), customPrice: true }, 'invalid_size');
+  check({ ...base, product: 'NoExiste', customPrice: true }, 'product_not_found');
+  for (const value of [-1, 1000001, 1.5, '1200']) check({ ...base, unitPriceCents: value, customPrice: true }, 'invalid_price');
+  const existingSize = validateSaleInput(validInput({ lines: [{ ...base, size: 10, customPrice: true }] }), catalog());
+  assert.equal(existingSize.items[0].unitPriceCents, 1200);
+});
+
 test('cantidad inválida es rechazada', () => {
   for (const q of [0, -2, 1.5, 100, '2', null]) {
     const bad = validInput({ lines: [{ product: 'Short', size: 10, quantity: q, unitPriceCents: 650 }] });
@@ -117,6 +144,47 @@ test('venta sin líneas es rechazada', () => {
 });
 
 // ---------- Persistencia (SQLite en memoria) ----------
+
+test('correction retains folio and before/after snapshots with exact retry and stale protection', () => {
+  const db = freshDb();
+  const original = createSale(db, validInput(), getCatalog(db));
+  const input = { expectedRevision: 0, retryKey: '123e4567-e89b-12d3-a456-426614174099',
+    lines: [{ product: 'Short', size: 10, quantity: 1, unitPriceCents: 650 }],
+    discountCents: 50, clientName: 'Corregida' };
+  const corrected = correctSale(db, original.id, input, getCatalog(db), '127.0.0.1');
+  assert.equal(corrected.id, original.id);
+  assert.equal(corrected.folio, original.folio);
+  assert.equal(corrected.revision, 1);
+  assert.equal(corrected.totalCents, 600);
+  assert.equal(corrected.corrections[0].before.totalCents, 1300);
+  assert.equal(corrected.corrections[0].after.totalCents, 600);
+  assert.equal(corrected.corrections[0].actor, '127.0.0.1');
+  assert.equal(correctSale(db, original.id, input, getCatalog(db)).corrections.length, 1);
+  expectError(() => correctSale(db, original.id, { ...input, discountCents: 0 }, getCatalog(db)), 'retry_key_conflict', 409);
+  expectError(() => correctSale(db, original.id, { ...input, retryKey: '123e4567-e89b-12d3-a456-426614174098' }, getCatalog(db)), 'stale_revision', 409);
+  assert.equal(createSale(db, validInput(), getCatalog(db)).totalCents, 600);
+  voidSale(db, original.id, 'Error');
+  expectError(() => correctSale(db, original.id, { ...input, expectedRevision: 1, retryKey: '123e4567-e89b-12d3-a456-426614174097' }, getCatalog(db)), 'already_voided', 409);
+  db.close();
+});
+
+test('unchanged retired catalog and manual snapshots survive correction; altered lines still validate', () => {
+  const db = freshDb();
+  const manual = { product: 'Short', size: 'A medida', quantity: 1, unitPriceCents: 1200, customPrice: true };
+  const original = createSale(db, validInput({ lines: [manual, validInput().lines[0]] }), getCatalog(db));
+  replaceCatalog(db, catalog().filter((p) => p.name !== 'Short'));
+  const base = { expectedRevision: 0, retryKey: '123e4567-e89b-12d3-a456-426614174099',
+    lines: original.items.map((it) => ({ product: it.productName, size: it.size,
+      quantity: it.quantity, unitPriceCents: it.unitPriceCents, ...(it.customPrice ? { customPrice: true } : {}) })),
+    clientName: null, discountCents: 0 };
+  expectError(() => correctSale(db, original.id, { ...base, lines: [{ ...base.lines[0], quantity: 2 }] }, getCatalog(db)), 'product_not_found', 400);
+  expectError(() => correctSale(db, original.id, { ...base, lines: [null] }, getCatalog(db)), 'invalid_line', 400);
+  assert.equal(getSale(db, original.id).revision, 0, 'invalid corrections roll back entirely');
+  const corrected = correctSale(db, original.id, base, getCatalog(db));
+  assert.equal(corrected.items[0].customPrice, true);
+  assert.equal(corrected.totalCents, original.totalCents);
+  db.close();
+});
 
 function freshDb() {
   const db = openDb(':memory:');

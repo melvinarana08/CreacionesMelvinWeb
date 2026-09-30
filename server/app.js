@@ -17,6 +17,7 @@ import {
   getCatalog,
   replaceCatalog,
   createSale,
+  correctSale,
   voidSale,
   getSale,
   listSales,
@@ -232,7 +233,8 @@ export function createApp(opts) {
       if (!existing) {
         logAudit(db, 'sale.create', sale.deviceId, { folio: sale.folio, totalCents: sale.totalCents });
       }
-      return sendJson(res, existing ? 200 : 201, { sale });
+      const { corrections, ...publicSale } = sale;
+      return sendJson(res, existing ? 200 : 201, { sale: publicSale });
     }
 
     if (method === 'GET' && /^\/api\/sales\/[^/]+$/.test(pathname)) {
@@ -242,7 +244,8 @@ export function createApp(opts) {
       const id = decodeURIComponent(pathname.split('/').pop());
       const sale = getSale(db, id);
       if (!sale) throw new HttpError(404, 'sale_not_found', 'Venta no encontrada');
-      return sendJson(res, 200, { sale });
+      const { corrections, ...publicSale } = sale;
+      return sendJson(res, 200, { sale: publicSale });
     }
 
     // ---- Clientes recordados ----
@@ -370,6 +373,13 @@ export function createApp(opts) {
           : null;
         const limit = Number(url.searchParams.get('limit')) || 100;
         return sendJson(res, 200, { sales: listSales(db, { status, limit }) });
+      }
+
+      if (method === 'POST' && /^\/api\/admin\/sales\/[^/]+\/correct$/.test(pathname)) {
+        const id = decodeURIComponent(pathname.split('/')[4]);
+        const body = await readJsonBody(req);
+        const sale = correctSale(db, id, body, getCatalog(db), ip);
+        return sendJson(res, 200, { sale });
       }
 
       if (method === 'POST' && /^\/api\/admin\/sales\/[^/]+\/void$/.test(pathname)) {

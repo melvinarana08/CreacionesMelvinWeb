@@ -41,6 +41,32 @@ test('validateLine: reglas de cantidad, precio y producto', () => {
   assert.equal(D.validateLine({ product: 'Chaleco', size: '', quantity: 1, unitPriceCents: 1200 }).ok, false);
 });
 
+test('línea manual normaliza talla, valida precio y serializa solo la excepción', () => {
+  assert.equal(D.normalizeSizeInput(' 4 '), 4);
+  assert.equal(D.parseSalePriceInput('12.50'), 1250);
+  for (const bad of ['', '12.345', '-1', '10000.01', 'abc']) assert.equal(D.parseSalePriceInput(bad), null);
+  const manual = { product: 'Short', size: 'A medida', quantity: 2, unitPriceCents: 1250, customPrice: true };
+  const result = D.buildSalePayload({ cart: [manual], clientName: '', discountCents: 100,
+    deviceId: 'dev-1', id: '123e4567-e89b-12d3-a456-426614174000' });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.payload.lines, [manual]);
+  assert.equal(D.validateLine({ ...manual, customPrice: 'true' }).ok, false);
+  assert.equal(D.validateLine({ ...manual, unitPriceCents: 1000001 }).ok, false);
+});
+
+test('vista previa y ajuste de línea conservan precio, respetan 1–99 y recalculan importes', () => {
+  assert.equal(D.formatAddPreview('Pant.', null, 6), 'Elegí una talla para agregar');
+  assert.equal(D.formatAddPreview('Pant.', 4, 6), 'Pant. 4 # 6');
+  const line = { product: 'Pant.', size: 4, quantity: 2, unitPriceCents: 1250, customPrice: true };
+  const raised = D.changeLineQuantity(line, 1);
+  assert.equal(D.computeSubtotal([raised]), 3750);
+  assert.equal(D.computeTotal(D.computeSubtotal([raised]), 250), 3500);
+  assert.equal(line.quantity, 2);
+  assert.equal(D.changeLineQuantity({ ...line, quantity: 1 }, -1), null);
+  assert.equal(D.changeLineQuantity({ ...line, quantity: 99 }, 1), null);
+  assert.deepEqual(D.changeLineQuantity(line, -1), { ...line, quantity: 1 });
+});
+
 test('buildSalePayload construye el payload con snapshot de precios', () => {
   const r = D.buildSalePayload({
     cart: [{ product: 'Short', size: 10, quantity: 2, unitPriceCents: 650 }],

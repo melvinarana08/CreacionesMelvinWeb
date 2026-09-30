@@ -14,25 +14,26 @@
   <header class="app-header">
     <div class="header-main">
       <h1>Creaciones Melvin</h1>
-      <nav class="header-nav" aria-label="Navegación principal">
-        <button type="button" id="navSalesBtn" class="btn btn-small nav-btn active" aria-pressed="true">🛒 Ventas</button>
-        <button type="button" id="navEncargosBtn" class="btn btn-small nav-btn" aria-pressed="false">📦 Encargos <span id="encargosBadge" class="badge" hidden>0</span></button>
-      </nav>
+      <button type="button" id="navToggleBtn" class="btn btn-small nav-toggle" aria-controls="sideNav" aria-expanded="false" aria-label="Abrir menú">☰ Menú</button>
     </div>
     <div class="status-bar" id="statusBar">
       <span class="dot" id="connDot" aria-hidden="true"></span>
       <span id="connText" role="status">Conectando…</span>
       <span class="pending-badge" id="pendingBadge" hidden></span>
-      <label class="theme-control" for="themeSelect"><span>Tema</span>
-        <select id="themeSelect" aria-label="Tema visual">
-          <option value="light">Claro</option>
-          <option value="dark">Noche</option>
-          <option value="eink">E-ink</option>
-        </select>
-      </label>
+      <button type="button" id="themeButton" class="btn btn-small theme-control" aria-label="Tema actual: Claro. Cambiar a Noche">Tema: Claro</button>
+      <span id="themeStatus" class="theme-status" role="status" aria-live="polite" aria-atomic="true"></span>
       <button type="button" id="syncBtn" class="btn btn-small">Sincronizar</button>
     </div>
   </header>
+
+  <button type="button" id="navBackdrop" class="nav-backdrop" aria-label="Cerrar menú" hidden></button>
+  <nav id="sideNav" class="side-nav" aria-label="Navegación principal" hidden>
+    <button type="button" id="navCloseBtn" class="btn btn-small nav-close">Cerrar menú</button>
+    <button type="button" id="navSalesBtn" class="btn nav-btn active" aria-current="page">🛒 Ventas</button>
+    <button type="button" id="navEncargosBtn" class="btn nav-btn">📦 Encargos <span id="encargosBadge" class="badge" hidden>0</span></button>
+    <button type="button" id="navCustomersBtn" class="btn nav-btn">👥 Clientes</button>
+    <button type="button" id="adminLink" class="btn nav-btn">Administración</button>
+  </nav>
 
   <!-- ============ VENTA ============ -->
   <main id="saleView">
@@ -58,8 +59,18 @@
         </div>
         <p class="picker-step" id="sizeStepLabel">2. Elegí la talla</p>
         <div id="sizeChips" class="size-chips" role="group" aria-labelledby="sizeStepLabel" aria-describedby="sizeGuidance"></div>
+        <label class="manual-toggle"><input id="manualLineToggle" type="checkbox"> Talla y precio manuales (solo esta venta)</label>
+        <div id="manualLineFields" class="manual-line-fields" hidden>
+          <label for="manualSizeInput">Talla manual
+            <input id="manualSizeInput" type="text" maxlength="20" placeholder="Ej. 4 o a medida" autocomplete="off">
+          </label>
+          <label for="manualPriceInput">Precio unitario (USD)
+            <input id="manualPriceInput" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
+          </label>
+        </div>
         <p id="sizeGuidance" class="size-guidance" role="status" aria-live="polite" hidden>Elegí una talla antes de agregar.</p>
         <div class="picker-add-row">
+          <span id="addLinePreview" class="add-line-preview" role="status" aria-live="polite">Elegí una talla para agregar</span>
           <button type="button" id="addLineBtn" class="btn btn-primary">Agregar</button>
         </div>
       </div>
@@ -71,6 +82,7 @@
         <div class="cart-title-actions">
           <button type="button" id="localReprintBtn" class="btn btn-small btn-reprint">🖨️ Reimprimir venta</button>
           <button type="button" id="cancelEncargoModeBtn" class="btn btn-small btn-danger-soft" hidden>Cancelar encargo</button>
+          <button type="button" id="cancelSaleCorrectionBtn" class="btn btn-small" hidden>Cancelar corrección</button>
         </div>
       </div>
       <p id="cartEmpty" class="muted">El carrito está vacío.</p>
@@ -112,6 +124,21 @@
       </div>
       <button type="button" id="mobileCartBtn" class="btn">Ver venta ↓</button>
     </div>
+  </main>
+
+  <!-- ============ CLIENTES ============ -->
+  <main id="customersView" class="card customers-view" aria-label="Clientes" hidden>
+    <h2>Clientes guardados</h2>
+    <p class="muted">Guardá nombres para encontrarlos al vender. También podés escribir un nombre libre en la venta.</p>
+    <form id="createCustomerForm" class="customer-form">
+      <label for="customerNameInput">Nombre del cliente</label>
+      <input id="customerNameInput" type="text" maxlength="100" autocomplete="name" required placeholder="Nombre del cliente">
+      <button type="submit" id="createCustomerBtn" class="btn btn-primary">Guardar cliente</button>
+    </form>
+    <p id="customerCreateStatus" class="status-text" role="status" aria-live="polite" hidden></p>
+    <label for="customerSearchInput">Buscar clientes guardados</label>
+    <input id="customerSearchInput" type="search" maxlength="100" autocomplete="off" placeholder="Buscar por nombre">
+    <ul id="customersList" class="customers-list"></ul>
   </main>
 
   <!-- ============ ENCARGOS Y TALLER ============ -->
@@ -292,6 +319,7 @@
       <div id="saleDetailBody" class="receipt-body"></div>
       <p id="saleDetailStatus" class="status-text" role="status" hidden></p>
       <div class="dialog-actions">
+        <button type="button" id="saleDetailEditBtn" class="btn" hidden>Editar venta</button>
         <button type="button" id="saleDetailReprintBtn" class="btn btn-primary">🖨️ Reimprimir</button>
         <button type="button" id="saleDetailCloseBtn" class="btn">Cerrar</button>
       </div>
@@ -312,7 +340,6 @@
   </dialog>
 
   <footer class="app-footer">
-    <button type="button" id="adminLink" class="btn btn-small">Administración</button>
     <span id="appVersion" class="app-version" aria-live="polite"></span>
   </footer>
 

@@ -90,6 +90,35 @@ async function adminGet(base, cookie, p) {
   return jsonFetch(base, p, { cookie });
 }
 
+test('admin correction requires session, CSRF and same origin; retries do not duplicate history', async (t) => {
+  const { base, close } = await startServer();
+  t.after(close);
+  const created = await jsonFetch(base, '/api/sales', { method: 'POST', body: salePayload() });
+  assert.equal(created.status, 201);
+  const route = `/api/admin/sales/${UUID1}/correct`;
+  const body = { expectedRevision: 0, retryKey: UUID2, clientName: 'Corrección',
+    lines: salePayload().lines, discountCents: 100 };
+  assert.equal((await jsonFetch(base, route, { method: 'POST', body })).status, 401);
+  const session = await jsonFetch(base, '/api/admin/login', { method: 'POST', body: { password: ADMIN_PASSWORD } });
+  const cookie = cookieFrom(session.setCookie);
+  assert.equal((await jsonFetch(base, route, { method: 'POST', body, cookie })).status, 403);
+  assert.equal((await jsonFetch(base, route, { method: 'POST', body, cookie,
+    headers: { Origin: 'https://attacker.invalid', 'X-CSRF-Token': session.data.csrfToken } })).status, 403);
+  const options = { method: 'POST', body, cookie, headers: { 'X-CSRF-Token': session.data.csrfToken } };
+  const saved = await jsonFetch(base, route, options);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.sale.totalCents, 1200);
+  assert.equal(saved.data.sale.corrections[0].before.totalCents, 1300);
+  const publicSale = await jsonFetch(base, `/api/sales/${UUID1}`);
+  assert.equal(publicSale.status, 200);
+  assert.equal('corrections' in publicSale.data.sale, false);
+  assert.equal((await jsonFetch(base, route, options)).data.sale.corrections.length, 1);
+  assert.equal((await jsonFetch(base, route, { ...options, body: { ...body, retryKey: UUID3 } })).status, 409);
+  assert.equal((await jsonFetch(base, `/api/admin/sales/${UUID1}/void`, {
+    method: 'POST', body: { reason: 'Error' }, cookie, headers: options.headers })).status, 200);
+  assert.equal((await jsonFetch(base, route, { ...options, body: { ...body, retryKey: UUID3, expectedRevision: 1 } })).status, 409);
+});
+
 test('sirve el módulo de interacciones de UI', async (t) => {
   const { base, close } = await startServer();
   t.after(close);

@@ -48,6 +48,8 @@ export const adminSession = () => apiFetch('/api/admin/session');
 export const adminLogout = (csrf) => apiFetch('/api/admin/logout', { method: 'POST', csrf });
 export const adminListSales = (csrf, status = '', limit = 100) =>
   apiFetch(`/api/admin/sales?status=${encodeURIComponent(status)}&limit=${limit}`, { csrf });
+export const adminCorrectSale = (csrf, id, correction) =>
+  apiFetch(`/api/admin/sales/${encodeURIComponent(id)}/correct`, { method: 'POST', body: correction, csrf });
 export const adminVoidSale = (csrf, id, reason) =>
   apiFetch(`/api/admin/sales/${encodeURIComponent(id)}/void`, { method: 'POST', body: { reason }, csrf });
 export const adminPutCatalog = (csrf, catalog) =>

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { runInNewContext } from 'node:vm';
+import * as S from '../public/storage.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
@@ -25,6 +27,33 @@ test('el alta de producto incluye selector de tallas y talla personalizada', () 
 
 test('el atributo hidden no puede ser anulado por estilos de vistas', () => {
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
+});
+
+test('navigation exposes desktop sidebar and mobile dismissible drawer with protected admin entry', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  for (const id of ['sideNav', 'navToggleBtn', 'navBackdrop', 'navCloseBtn', 'navSalesBtn', 'navEncargosBtn', 'navCustomersBtn', 'adminLink']) {
+    assert.ok(html.includes(`id="${id}"`), `missing navigation control ${id}`);
+  }
+  assert.match(html, /id="navToggleBtn"[^>]*aria-controls="sideNav"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="sideNav"[^>]*aria-label="Navegación principal"/);
+  assert.match(css, /@media \(min-width: 1100px\)[\s\S]*\.side-nav/);
+  assert.match(css, /\.nav-backdrop/);
+  assert.match(app, /event\.key === 'Escape'[\s\S]*closeNavigation\(true\)/);
+  assert.match(app, /adminLink'\)\.addEventListener\('click', showAdminLogin\)/);
+  assert.match(app, /Api\.adminSession\(\)/);
+});
+
+test('customers view creates names through public API and local cache without altering sale free text', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  for (const id of ['customersView', 'createCustomerForm', 'customerNameInput', 'customerCreateStatus', 'customerSearchInput', 'customersList']) {
+    assert.ok(html.includes(`id="${id}"`), `missing customer view ${id}`);
+  }
+  assert.match(app, /Api\.postClient\(name\)/);
+  assert.match(app, /S\.rememberClient\(res\.ok/);
+  assert.match(app, /Api\.fetchClients\(\)/);
+  assert.match(app, /filterCustomerSuggestions\(state\.clients, query\)/);
+  assert.match(html, /id="clientInput"[^>]*type="text"/);
+  assert.doesNotMatch(html, /id="customerPhoneInput"|id="customerAddressInput"/);
 });
 
 test('el login verifica que la cookie de sesión quedó activa antes de abrir administración', () => {
@@ -133,15 +162,29 @@ test('barra móvil y layout tablet usan columnas seguras sin solaparse en paisaj
   assert.match(css, /\.qty-btn\s*\{[\s\S]*min-width:\s*48px/);
 });
 
-test('service worker y app están alineados en caché v21 y precargan el shell cambiado', () => {
+test('service worker y app están alineados en caché v22 y precargan el shell cambiado', () => {
   const sw = readFileSync(path.join(ROOT, 'public', 'sw.js'), 'utf8');
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
-  assert.match(sw, /cm-sales-v21/);
+  assert.match(sw, /cm-sales-v22/);
+  for (const asset of ['/', '/index.html', '/styles.css', '/app.js']) assert.ok(sw.includes(`'${asset}'`));
   assert.match(sw, /'\/ui-interactions\.js'/);
   assert.match(sw, /'\/receipt-image\.js'/);
-  assert.match(app, /swVersion = 'v21'/);
+  assert.match(app, /swVersion = 'v22'/);
   assert.match(app, /from '\.\/ui-interactions\.js'/);
   assert.match(app, /from '\.\/receipt-image\.js'/);
+});
+
+test('correction reuses sale cart without writing offline queue or creating a sale', () => {
+  const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
+  const api = readFileSync(path.join(ROOT, 'public', 'api.js'), 'utf8');
+  assert.match(html, /id="saleDetailEditBtn"[^>]*hidden/);
+  assert.match(html, /id="cancelSaleCorrectionBtn"[^>]*hidden/);
+  assert.match(app, /sale\.status !== 'active'/);
+  assert.match(app, /state\.cart = sale\.items\.map/);
+  assert.match(app, /if \(state\.correction\) return saveSaleCorrection\(\)/);
+  assert.match(app, /if \(!state\.correction\) S\.saveCart\(state\.cart\)/);
+  assert.match(app, /Api\.adminCorrectSale\(state\.admin\.csrf/);
+  assert.match(api, /adminCorrectSale = \(csrf, id, correction\)/);
 });
 
 test('selector de venta presenta cantidad antes de talla y exige talla explícita', () => {
@@ -156,7 +199,7 @@ test('selector de venta presenta cantidad antes de talla y exige talla explícit
   assert.match(app, /state\.selectedSize = null/);
   assert.doesNotMatch(app, /state\.selectedSize = product\.sizes\[0\]\.size/);
   assert.doesNotMatch(app, /state\.selectedSize = s\.size;\s*state\.qty = 1/);
-  assert.match(app, /if \(state\.selectedSize === null\) \{[\s\S]*sizeGuidance'\)\.hidden = false/);
+  assert.match(app, /if \(size === null\) \{[\s\S]*sizeGuidance'\)\.hidden = false/);
   assert.match(app, /sizeGuidance'\)\.hidden = true/);
   assert.match(app, /finishBtn'\)\.scrollIntoView/);
   const chipHandler = app.match(/chip\.addEventListener\('click', \(\) => \{([\s\S]*?)\n    \}\);/)?.[1] || '';
@@ -292,20 +335,65 @@ test('login admin tiene frontera de formulario y conserva current-password', () 
   assert.match(app, /adminLogin'\)\.addEventListener\('submit'[\s\S]*event\.preventDefault\(\)/);
 });
 
-test('selector de tema aplica claro, noche y e-ink sin mezclar restricciones', () => {
-  assert.match(html, /<label class="theme-control" for="themeSelect"><span>Tema<\/span>/);
-  for (const value of ['light', 'dark', 'eink']) assert.ok(html.includes(`value="${value}"`));
+test('un botón de tema recorre los tres modos, informa el activo y conserva persistencia e-ink', () => {
+  assert.match(html, /<button[^>]*id="themeButton"[^>]*aria-label="Tema actual: Claro\. Cambiar a Noche"/);
+  assert.match(html, /id="themeStatus"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.doesNotMatch(html, /id="themeSelect"/);
   const app = readFileSync(path.join(ROOT, 'public', 'app.js'), 'utf8');
   assert.match(app, /applyTheme\(S\.loadTheme\(\)\)/);
-  assert.match(app, /document\.documentElement\.dataset\.theme = selectedTheme/);
-  assert.match(app, /classList\.toggle\('eink-mode', selectedTheme === 'eink'\)/);
-  assert.match(app, /meta\[name="theme-color"\]/);
-  assert.match(app, /S\.saveTheme\(event\.currentTarget\.value\)/);
+  assert.match(app, /themeButton'\)\.addEventListener\('click', cycleTheme\)/);
   assert.match(app, /contains\('eink-mode'\)\) return/);
   assert.match(css, /:root\[data-theme="dark"\]/);
-  assert.match(css, /\.theme-control select[^}]*min-height:\s*44px/);
+  assert.match(css, /\.theme-control[^}]*min-height:\s*44px/);
+  assert.match(css, /\.app-header \.theme-control:focus-visible[^}]*outline:/);
+  assert.match(css, /\.eink-mode \.app-header \.theme-control:focus-visible[^}]*outline-color: #000/);
+  assert.match(css, /@media \(max-width: 600px\)[\s\S]*\.status-bar \{ width: 100%/);
   assert.match(css, /\.eink-mode, \.eink-mode body/);
   assert.match(css, /\.eink-mode[\s\S]*border:\s*2px solid #000/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
+
+  const themeCode = app.split('const THEME_COLORS = ')[1]?.split('async function init()')[0];
+  assert.ok(themeCode, 'theme behavior must remain available before initialization');
+  const button = { textContent: '', setAttribute(key, value) { this[key] = value; } };
+  const status = { textContent: '' };
+  const meta = { setAttribute(key, value) { this[key] = value; } };
+  const classes = new Set();
+  const document = {
+    documentElement: { dataset: {}, classList: {
+      toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
+    } },
+    querySelector() { return meta; },
+  };
+  const storage = new Map();
+  const store = {
+    getItem(key) { return storage.get(key) ?? null; },
+    setItem(key, value) { storage.set(key, String(value)); },
+    removeItem(key) { storage.delete(key); },
+  };
+  const themeStorage = { saveTheme: (theme) => S.saveTheme(theme, store), loadTheme: () => S.loadTheme(store) };
+  const { applyTheme, cycleTheme } = runInNewContext(
+    `const THEME_COLORS = ${themeCode}; ({ applyTheme, cycleTheme })`,
+    { document, S: themeStorage, $: (id) => ({ themeButton: button, themeStatus: status })[id] },
+  );
+  store.setItem('cm_eink_mode', 'true');
+  applyTheme(themeStorage.loadTheme());
+  for (const [current, next, color, eink] of [
+    ['E-ink', 'Claro', '#0f766e', false],
+    ['Claro', 'Noche', '#0f172a', false],
+    ['Noche', 'E-ink', '#ffffff', true],
+    ['E-ink', 'Claro', '#0f766e', false],
+  ]) {
+    assert.equal(button.textContent, `Tema: ${current}`);
+    assert.equal(button['aria-label'], `Tema actual: ${current}. Cambiar a ${next}`);
+    assert.equal(status.textContent, `Tema activo: ${current}`);
+    cycleTheme();
+    assert.equal(button.textContent, `Tema: ${next}`);
+    assert.equal(meta.content, color);
+    assert.equal(classes.has('eink-mode'), eink);
+    assert.equal(themeStorage.loadTheme(), document.documentElement.dataset.theme);
+    assert.equal(store.getItem('cm_eink_mode'), eink ? 'true' : 'false');
+  }
+  applyTheme('invalid');
+  assert.equal(button.textContent, 'Tema: Claro');
 });

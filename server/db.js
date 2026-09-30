@@ -1,7 +1,7 @@
 // db.js — apertura y esquema SQLite (node:sqlite, cero dependencias).
 import { DatabaseSync } from 'node:sqlite';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS sales (
   client_ts TEXT,                           -- timestamp del cliente (ISO)
   server_ts TEXT NOT NULL,                  -- timestamp del servidor (ISO)
   void_reason TEXT,
-  voided_at TEXT
+  voided_at TEXT,
+  revision INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sale_items (
@@ -38,8 +39,24 @@ CREATE TABLE IF NOT EXISTS sale_items (
   product_name TEXT NOT NULL,               -- snapshot inmutable
   size INTEGER NOT NULL,                    -- snapshot inmutable
   unit_price_cents INTEGER NOT NULL,        -- snapshot inmutable
-  quantity INTEGER NOT NULL
+  quantity INTEGER NOT NULL,
+  custom_price INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS sale_corrections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id TEXT NOT NULL REFERENCES sales(id) ON DELETE RESTRICT,
+  revision INTEGER NOT NULL,
+  retry_key TEXT NOT NULL,
+  request TEXT NOT NULL,
+  corrected_at TEXT NOT NULL,
+  actor TEXT,
+  before_snapshot TEXT NOT NULL,
+  after_snapshot TEXT NOT NULL,
+  UNIQUE(sale_id, revision),
+  UNIQUE(sale_id, retry_key)
+);
+CREATE INDEX IF NOT EXISTS idx_sale_corrections_sale_id ON sale_corrections(sale_id);
 
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
@@ -150,10 +167,22 @@ export function openDb(file) {
         CREATE INDEX IF NOT EXISTS idx_encargo_items_encargo_id ON encargo_items(encargo_id);
       `);
       db.prepare("UPDATE meta SET value = '2' WHERE key = 'schema_version'").run();
-    } else if (v !== SCHEMA_VERSION) {
+    } else if (v !== 2 && v !== SCHEMA_VERSION) {
       throw new Error(
         `Esquema de base de datos no soportado: versión ${row.value} (esperada ${SCHEMA_VERSION}). Restaura un respaldo o migra manualmente.`
       );
+    }
+  }
+  if (Number(db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value) === 2) {
+    db.exec('BEGIN');
+    try {
+      db.exec('ALTER TABLE sales ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
+      db.exec('ALTER TABLE sale_items ADD COLUMN custom_price INTEGER NOT NULL DEFAULT 0');
+      db.prepare("UPDATE meta SET value = '3' WHERE key = 'schema_version'").run();
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
     }
   }
   return db;

@@ -26,6 +26,23 @@ function sizeKey(size) {
   return typeof size === 'number' ? `n:${size}` : `s:${size.toLocaleLowerCase('es')}`;
 }
 
+export function parseSalePriceInput(text) {
+  if (typeof text !== 'string' || !/^(?:\d+)(?:\.\d{1,2})?$/.test(text.trim())) return null;
+  const [dollars, cents = ''] = text.trim().split('.');
+  const value = Number(dollars) * 100 + Number(cents.padEnd(2, '0'));
+  return Number.isSafeInteger(value) && value <= 1_000_000 ? value : null;
+}
+
+export function formatAddPreview(product, size, quantity) {
+  return product && size !== null ? `${product} ${size} # ${quantity}` : 'Elegí una talla para agregar';
+}
+
+/** Ajusta una línea sin mutarla ni sobrepasar el límite de 1–99. */
+export function changeLineQuantity(line, delta) {
+  const next = { ...line, quantity: line.quantity + delta };
+  return validateLine(next).ok ? next : null;
+}
+
 export function computeLineTotal(unitPriceCents, quantity) {
   return unitPriceCents * quantity;
 }
@@ -82,8 +99,11 @@ export function validateLine(line) {
   if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_QTY) {
     return { ok: false, reason: `La cantidad debe ser entre 1 y ${MAX_QTY}` };
   }
-  if (!Number.isInteger(line.unitPriceCents) || line.unitPriceCents < 0) {
+  if (!Number.isSafeInteger(line.unitPriceCents) || line.unitPriceCents < 0 || line.unitPriceCents > 1_000_000) {
     return { ok: false, reason: 'Precio de la línea inválido' };
+  }
+  if (line.customPrice !== undefined && line.customPrice !== true) {
+    return { ok: false, reason: 'Indicador de precio manual inválido' };
   }
   return { ok: true };
 }
@@ -121,6 +141,7 @@ export function buildSalePayload({ cart, clientName, discountCents, deviceId, id
         size: l.size,
         quantity: l.quantity,
         unitPriceCents: l.unitPriceCents,
+        ...(l.customPrice === true ? { customPrice: true } : {}),
       })),
       discountCents,
       clientTs: typeof clientTs === 'string' ? clientTs : new Date().toISOString(),
